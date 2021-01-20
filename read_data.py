@@ -5,6 +5,7 @@ from struct import *
 from collections import namedtuple
 
 def b2s(string_bytes):
+    # convert ASCII bytes to a python string. strip trailing null characters.
     string = string_bytes.decode('utf-8')  # convert bytes to a string
     last=next((i for i in range(len(string)-1,0,-1) if string[i] != '\0'), -1) # find the last non-null char
     return string[0:last+1]  # return the substring
