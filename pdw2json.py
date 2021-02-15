@@ -12,6 +12,8 @@ args = parser.parse_args()
 pdw_filename = args.pdw_file
 json_filename = args.json_file
 
+# https://docs.python.org/3.8/library/struct.html
+
 # (U) The PDW fileraw_data interface is a file format definition. The convention for PDW file
 # is of the form: SS_YYYYMMDD_HHMMSS_NNNNNNNNNN_SSSSSSSSSSSSSSSSSSSS.pdw, naming
 #
@@ -24,7 +26,7 @@ json_filename = args.json_file
 # Table 18: (U) Platinum Data Formats Name Description
 
 type_mapping = {
-    'SA': '', # SA Scalar ASCII data
+    'SA': '',  # SA Scalar ASCII data
     'SB': 'h', # SB Scalar signed 8-bit integer
     'SD': 'd', # SD Scalar 64-bit floating point value
     'SF': 'f', # SF Scalar 32-bit floating point value
@@ -46,15 +48,26 @@ sources = {
 
 # prefix of ANT ?
 header_format= [
-    ('TOA', 'q'),
-    ('PF',  'd'),
-    ('PW',  'f'),
-    ('PA',  'f'),
-    ('SNR', 'f')
+    ('TOA',            'SX'),
+    ('PF',             'SD'),
+    ('PW',             'SF'),
+    ('PA',             'SF'),
+    ('SNR',            'SF'),
+    ('MOD_TYPE',       'SB'),
+    ('AOA_TYPE',       'SB'),
+    ('CHANNEL',        'SB'),
+    ('MOD_PARAMETER',  'SF'),
+    ('AOA',            'SF'),
+    ('FLAGS',          'SI'),
+    ('DEINT_ID',       'SI'),
+    ('PHASE',          'SF'),
+    ('PHASE_REF_TIME', 'SD'),
+    ('TOA_DEV',        'SF'),
+    ('PF_DEV',         'SF')
 ]
 
-struct_format = ''.join(tuple[1] for tuple in header_format)
-header_record = namedtuple('pdw_header', (' '.join(tuple[0] for tuple in header_format))
+# struct_format = '='+''.join(tuple[1] for tuple in header_format)
+# header_record = namedtuple('pdw_header', (' '.join(tuple[0] for tuple in header_format)))
 
 pdw_file = open(pdw_filename, "rb")
 raw_data = pdw_file.read(64)
