@@ -44,7 +44,7 @@ verbose = args.verbose
 
 logger = VerboseLogger() if verbose else SilentLogger()
 
-logger.log(args)
+# logger.log(args)
 
 if (suffix): # filter to only files with a matching suffix
     pattern = f'.*{suffix}$'  # pattern for file suffix
@@ -53,6 +53,10 @@ else:
 filter = re.compile(pattern, flags=re.IGNORECASE)
 
 # Create as an array because we will be deleting as we go along.
+# This code only handles the top directory. It does not recurse into subdirectories.
+# Use os.walk if recursion is needed.
+# https://docs.python.org/3/library/os.html#os.walk
+
 filenames_iter = [ entry.name for entry in os.scandir(source_directory) if filter.match(entry.name) ]
 filenames = [*filenames_iter]
 
