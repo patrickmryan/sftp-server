@@ -8,7 +8,7 @@ class Logger:
         self.prefix=prefix
         pass
 
-    def log(message):
+    def log(self, message):
         pass # do nothing
 
 class SilentLogger(Logger):
