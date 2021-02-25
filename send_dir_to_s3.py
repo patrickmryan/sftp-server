@@ -98,7 +98,7 @@ for event in listener.event_gen(yield_nones=False):
 
     except s3_client.exceptions.NoSuchBucket as e:
         print(e)
-        print('no bucket named ' + event['destination'])
+        print(f'no bucket named {s3bucket}')
         # pass
 
     if (uploaded):
