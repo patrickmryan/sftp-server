@@ -1,9 +1,7 @@
 import boto3
 import inotify.adapters
 import subprocess
-import urllib, argparse, sys, re
-import os
-import os.path
+import argparse, sys, re
 
 # https://pypi.org/project/inotify/
 
@@ -27,6 +25,7 @@ class SilentLogger(Logger):
 class VerboseLogger(Logger):
     def log(self, message):
         print(f'{self.prefix}{message}')
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--directory', dest='directory', required=True)
@@ -60,11 +59,11 @@ for event in listener.event_gen(yield_nones=False):
         continue   # we only care about IN_CLOSE_WRITE events
 
     print(f"PATH=[{path}] FILENAME=[{filename}]")
-    absolute_path = os.path.normpath(f'{path}/{filename}')
-    key=os.path.relpath(absolute_path, start=root_directory)
-
+    absolute_path = os.path.normpath(path+filename)
+    key=os.relpath(absolute_path, start=root_directory)
     if (s3prefix):
         key = f'{s3prefix}/{key}'
+
 
     tags = {
         "filename" : absolute_path
@@ -87,10 +86,10 @@ for event in listener.event_gen(yield_nones=False):
         #    StorageClass, ACL, encryption
         #
 
-        response = s3_client.put_object(Bucket=s3bucket,
-                                        Key=key,
-                                        Body=open(absolute_path, "rb"),
-                                        Tagging=tagging)
+        # response = s3_client.put_object(Bucket=s3bucket,
+        #                                 Key=key,
+        #                                 Body=open(absolute_path, "rb"),
+        #                                 Tagging=tagging)
 
         # will only get here if put_object succeeded
         uploaded=True
