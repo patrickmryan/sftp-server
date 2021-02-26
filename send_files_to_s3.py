@@ -33,6 +33,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--directory', dest='directory', required=True)
 parser.add_argument('--s3bucket', dest='s3bucket', required=True)
 parser.add_argument('--s3prefix', dest='s3prefix', required=False, default='')
+parser.add_argument('--suffix', dest='suffix', required=False, default='')
 parser.add_argument('--delete-after-upload', action='store_true', default=False)
 parser.add_argument('--verbose', action='store_true', default=False)
 
@@ -41,6 +42,7 @@ args = parser.parse_args()
 root_directory = args.directory
 s3bucket = args.s3bucket
 s3prefix = args.s3prefix
+suffix = args.suffix
 delete_after_upload = args.delete_after_upload
 verbose = args.verbose
 
@@ -48,6 +50,12 @@ logger = VerboseLogger() if verbose else SilentLogger()
 # inotifywait --monitor --recursive --quiet --event close_write $PWD/out
 
 s3_client = boto3.client('s3')
+
+if (suffix): # filter to only files with a matching suffix
+    pattern = f'.*{suffix}$'  # pattern for file suffix
+else:
+    pattern = '.*'            # match everything
+filter = re.compile(pattern, flags=re.IGNORECASE)
 
 listener = inotify.adapters.InotifyTree(root_directory)
 # listener.add_watch(directory)
@@ -66,6 +74,10 @@ for event in listener.event_gen(yield_nones=False):
 
     if (not ('IN_CLOSE_WRITE' in type_names)):
         continue   # we only care about IN_CLOSE_WRITE events
+
+    if (not filter.match(filename)):
+        print(f'{filename} does not match the pattern')
+        continue
 
     print(f"PATH=[{path}] FILENAME=[{filename}]")
     absolute_path = os.path.normpath(f'{path}/{filename}')
