@@ -1,3 +1,7 @@
+#
+#
+#
+
 import boto3
 import inotify.adapters
 import time
@@ -6,11 +10,6 @@ import os
 import os.path
 
 # https://pypi.org/project/inotify/
-
-# args
-#   --directory
-#   --s3bucket
-#   --delete-after-upload
 
 class Logger:
     def __init__(self, target=None, prefix=''):
@@ -76,7 +75,7 @@ for event in listener.event_gen(yield_nones=False):
         continue   # we only care about IN_CLOSE_WRITE events
 
     if (not filter.match(filename)):
-        print(f'{filename} does not match the pattern')
+        logger.log(f'ignoring {filename}')
         continue
 
     print(f"PATH=[{path}] FILENAME=[{filename}]")
