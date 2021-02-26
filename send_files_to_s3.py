@@ -1,7 +1,9 @@
 import boto3
 import inotify.adapters
-import subprocess
-import argparse, sys, re
+import time
+import urllib, argparse, sys, re
+import os
+import os.path
 
 # https://pypi.org/project/inotify/
 
@@ -50,28 +52,32 @@ s3_client = boto3.client('s3')
 listener = inotify.adapters.InotifyTree(root_directory)
 # listener.add_watch(directory)
 
+new_directory_event = set(['IN_CREATE', 'IN_ISDIR'])
+
 for event in listener.event_gen(yield_nones=False):
     (_, type_names, path, filename) = event
 
+    print(f"PATH=[{path}] FILENAME=[{filename}] EVENT_TYPES={type_names}")
 
-    #print(f"PATH=[{path}] FILENAME=[{filename}] EVENT_TYPES={type_names}")
+    if (set(type_names) == new_directory_event):
+        print('new directory, need to pause')
+        time.sleep(2)  # wait a bit
+        continue
+
     if (not ('IN_CLOSE_WRITE' in type_names)):
         continue   # we only care about IN_CLOSE_WRITE events
 
     print(f"PATH=[{path}] FILENAME=[{filename}]")
-    absolute_path = os.path.normpath(path+filename)
-    key=os.relpath(absolute_path, start=root_directory)
+    absolute_path = os.path.normpath(f'{path}/{filename}')
+
+    key=os.path.relpath(absolute_path, start=root_directory)
     if (s3prefix):
         key = f'{s3prefix}/{key}'
-
+    key = os.path.normpath(key)  # remove any redundant characters
 
     tags = {
         "filename" : absolute_path
-        # "groupName" : groupName,
-        # "streamName" : streamName,
-        # "fromTime" : fromTime.isoformat(),
-        # "toTime" : toTime.isoformat(),
-        # "format" : "syslog gzipped"
+        # hostname?
     }
 
     tagging = urllib.parse.urlencode(tags)
@@ -86,19 +92,21 @@ for event in listener.event_gen(yield_nones=False):
         #    StorageClass, ACL, encryption
         #
 
-        # response = s3_client.put_object(Bucket=s3bucket,
-        #                                 Key=key,
-        #                                 Body=open(absolute_path, "rb"),
-        #                                 Tagging=tagging)
+        response = s3_client.put_object(Bucket=s3bucket,
+                                        Key=key,
+                                        Body=open(absolute_path, "rb"),
+                                        Tagging=tagging)
 
         # will only get here if put_object succeeded
         uploaded=True
-        logger.log(response)
+        # logger.log(response)
 
     except s3_client.exceptions.NoSuchBucket as e:
         print(e)
         print('no bucket named ' + event['destination'])
         # pass
+
+    # more s3 exception-handling
 
     if (uploaded):
         if (delete_after_upload):
