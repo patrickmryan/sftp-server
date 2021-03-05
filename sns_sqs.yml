@@ -1,0 +1,63 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+
+Parameters:
+  S3Bucket:
+    Type: String
+
+Resources:
+
+# SNS topic
+  NewObjectSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub 'new-object-topic'   #${AWS::StackId}
+
+# policy that allows S3 to publish to topic
+  AllowS3ToSendToSNS:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+        - !Ref NewObjectSNSTopic
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: "*"
+            Action:
+            - sns:Publish
+            Resource: !Ref NewObjectSNSTopic
+            Condition:
+              ArnEquals:
+                # aws:SourceArn: !GetAtt NewObjectSNSTopic.Arn
+                aws:SourceArn: !Sub 'arn:${AWS::Partition}:s3::${AWS::AccountId}:${S3Bucket}'
+
+
+# new object event notification on bucket that publishes to SNS
+#   CAN'T SEEM TO DO THIS SEPARATELY, only when creating the bucket
+
+# SQS Q
+  NewObjectQueue:
+    Type: AWS::SQS::Queue
+      # name
+
+  # policy that allows SNS to sendMessage to the Q
+  NewObjectQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref NewObjectQueue
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: "*"
+            Action:
+            - sqs:SendMessage
+            Resource: !GetAtt NewObjectQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref NewObjectSNSTopic
+
+
+# SQS subscription to SNS topic
