@@ -78,7 +78,7 @@ for event in listener.event_gen(yield_nones=False):
         logger.log(f'ignoring {filename}')
         continue
 
-    print(f"PATH=[{path}] FILENAME=[{filename}]")
+    # print(f"PATH=[{path}] FILENAME=[{filename}]")
     absolute_path = os.path.normpath(f'{path}/{filename}')
 
     key=os.path.relpath(absolute_path, start=root_directory)
@@ -122,7 +122,6 @@ for event in listener.event_gen(yield_nones=False):
 
     # We got here if the s3 put_object worked.
 
-    if (uploaded):
-        if (delete_after_upload):
-            os.remove(absolute_path)
-            logger.log(f'deleted {absolute_path}')
+    if (uploaded and delete_after_upload):
+        os.remove(absolute_path)
+        logger.log(f'deleted {absolute_path}')
