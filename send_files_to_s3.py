@@ -113,11 +113,14 @@ for event in listener.event_gen(yield_nones=False):
         # logger.log(response)
 
     except s3_client.exceptions.NoSuchBucket as e:
-        print(e)
-        print('no bucket named ' + event['destination'])
-        # pass
+        logger.log(e)
+        logger.log(f"ignoring {filename}, no bucket named {event['destination']}")
+        continue
+    except Exception as e:
+        logger.log(f'put_object failed with exception {e}')
+        continue
 
-    # more s3 exception-handling
+    # We got here if the s3 put_object worked.
 
     if (uploaded):
         if (delete_after_upload):
