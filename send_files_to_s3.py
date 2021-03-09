@@ -64,10 +64,10 @@ new_directory_event = set(['IN_CREATE', 'IN_ISDIR'])
 for event in listener.event_gen(yield_nones=False):
     (_, type_names, path, filename) = event
 
-    print(f"PATH=[{path}] FILENAME=[{filename}] EVENT_TYPES={type_names}")
+    # print(f"PATH=[{path}] FILENAME=[{filename}] EVENT_TYPES={type_names}")
 
     if (set(type_names) == new_directory_event):
-        print('new directory, need to pause')
+        # print('new directory, need to pause')
         time.sleep(2)  # wait a bit
         continue
 
