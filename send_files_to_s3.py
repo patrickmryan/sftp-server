@@ -59,69 +59,75 @@ filter = re.compile(pattern, flags=re.IGNORECASE)
 listener = inotify.adapters.InotifyTree(root_directory)
 # listener.add_watch(directory)
 
-new_directory_event = set(['IN_CREATE', 'IN_ISDIR'])
+try:  # catch keyboard interrupt
 
-for event in listener.event_gen(yield_nones=False):
-    (_, type_names, path, filename) = event
+    new_directory_event = set(['IN_CREATE', 'IN_ISDIR'])
 
-    # print(f"PATH=[{path}] FILENAME=[{filename}] EVENT_TYPES={type_names}")
+    for event in listener.event_gen(yield_nones=False):
+        (_, type_names, path, filename) = event
 
-    if (set(type_names) == new_directory_event):
-        # print('new directory, need to pause')
-        time.sleep(2)  # wait a bit
-        continue
+        # print(f"PATH=[{path}] FILENAME=[{filename}] EVENT_TYPES={type_names}")
 
-    if (not ('IN_CLOSE_WRITE' in type_names)):
-        continue   # we only care about IN_CLOSE_WRITE events
+        if (set(type_names) == new_directory_event):
+            # print('new directory, need to pause')
+            time.sleep(2)  # wait a bit
+            continue
 
-    if (not filter.match(filename)):
-        logger.log(f'ignoring {filename}')
-        continue
+        if (not ('IN_CLOSE_WRITE' in type_names)):
+            continue   # we only care about IN_CLOSE_WRITE events
 
-    # print(f"PATH=[{path}] FILENAME=[{filename}]")
-    absolute_path = os.path.normpath(f'{path}/{filename}')
+        if (not filter.match(filename)):
+            logger.log(f'ignoring {filename}')
+            continue
 
-    key=os.path.relpath(absolute_path, start=root_directory)
-    if (s3prefix):
-        key = f'{s3prefix}/{key}'
-    key = os.path.normpath(key)  # remove any redundant characters
+        # print(f"PATH=[{path}] FILENAME=[{filename}]")
+        absolute_path = os.path.normpath(f'{path}/{filename}')
 
-    tags = {
-        "filename" : absolute_path
-        # hostname?
-    }
+        key=os.path.relpath(absolute_path, start=root_directory)
+        if (s3prefix):
+            key = f'{s3prefix}/{key}'
+        key = os.path.normpath(key)  # remove any redundant characters
 
-    tagging = urllib.parse.urlencode(tags)
+        tags = {
+            "filename" : absolute_path
+            # hostname?
+        }
 
-    uploaded = False
-    try:
-        logger.log(f'uploading {absolute_path} to s3://{s3bucket}/{key}')
+        tagging = urllib.parse.urlencode(tags)
 
-        # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.put_object
-        #
-        # other params to think about:
-        #    StorageClass, ACL, encryption
-        #
+        uploaded = False
+        try:
+            logger.log(f'uploading {absolute_path} to s3://{s3bucket}/{key}')
 
-        response = s3_client.put_object(Bucket=s3bucket,
-                                        Key=key,
-                                        Body=open(absolute_path, "rb"),
-                                        Tagging=tagging)
+            # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.put_object
+            #
+            # other params to think about:
+            #    StorageClass, ACL, encryption
+            #
 
-        # will only get here if put_object succeeded
-        uploaded=True
-        # logger.log(response)
+            response = s3_client.put_object(Bucket=s3bucket,
+                                            Key=key,
+                                            Body=open(absolute_path, "rb"),
+                                            Tagging=tagging)
 
-    except s3_client.exceptions.NoSuchBucket as e:
-        logger.log(e)
-        logger.log(f"ignoring {filename}, no bucket named {event['destination']}")
-        continue
-    except Exception as e:
-        logger.log(f'put_object failed with exception {e}')
-        continue
+            # will only get here if put_object succeeded
+            uploaded=True
+            # logger.log(response)
 
-    # We got here if the s3 put_object worked.
+        except s3_client.exceptions.NoSuchBucket as e:
+            logger.log(e)
+            logger.log(f"ignoring {filename}, no bucket named {event['destination']}")
+            continue
+        except Exception as e:
+            logger.log(f'put_object failed with exception {e}')
+            continue
 
-    if (uploaded and delete_after_upload):
-        os.remove(absolute_path)
-        logger.log(f'deleted {absolute_path}')
+        # We got here if the s3 put_object worked.
+
+        if (uploaded and delete_after_upload):
+            # may need try-except here, too
+            os.remove(absolute_path)
+            logger.log(f'deleted {absolute_path}')
+
+except KeyboardInterrupt as e:
+    sys.exit(0)
