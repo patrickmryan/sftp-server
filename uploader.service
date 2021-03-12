@@ -6,6 +6,11 @@
 #
 # It is required if your command need to use the AWS API. Choose your region accordingly.
 #
+# Useful docs:
+#
+# https://www.freedesktop.org/software/systemd/man/systemd.service.html
+# https://www.freedesktop.org/software/systemd/man/system.conf.d.html
+
 
 [Unit]
 Description=S3 uploader
