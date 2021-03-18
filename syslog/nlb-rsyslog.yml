@@ -1,0 +1,195 @@
+AWSTemplateFormatVersion: '2010-09-09'
+#
+# Patrick M. Ryan
+# Cloud Practice Lead
+# patrick.ryan@evanschambers.com
+#
+#
+# Syslog ports:
+#    Standard    514   (TCP, UDP)
+
+Mappings:
+   # need way to select SW version, too
+   RegionMap:
+     us-east-1:
+       AMI: ami-062f7200baf2fa504
+     us-east-2:
+       AMI: ami-01aab85a5e4a5a0fe
+
+Parameters:
+  InterfaceVpcId:
+    Type: AWS::EC2::VPC::Id
+  SourcesCidrBlock:
+    Type: String
+    Default: 0.0.0.0/0
+  # InstanceRole:
+  #   Type: String
+  #   Description: ID of IAM instance profile role that provides access to S3 and CloudWatch
+  SyslogConfigFiles:
+    Type: String
+    Description: S3 key for CloudWatch configuration file archive
+    Default: rsyslog-files.tar
+  CodeBucket:
+    Type: String
+    Description: Name of S3 bucket that contains the code and config files
+  # SyslogAMI:
+  #   Type: String
+  #   Default: ami-062f7200baf2fa504
+  #   AllowedPattern: ^ami-\S+$
+  SyslogSubnets:
+    Type: List<AWS::EC2::Subnet::Id>
+  SyslogPort:
+    Type: String
+    Default: 514
+  # KeyName:
+  #   Description: Name of an existing EC2 KeyPair to enable SSH access to the instances
+  #   Type: AWS::EC2::KeyPair::KeyName
+  #   ConstraintDescription: must be the name of an existing EC2 KeyPair.
+
+Resources:
+
+  # used by EC2 instances that serve as rsyslog servers
+  SyslogRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'syslog-role-${AWS::StackId}'
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      ManagedPolicyArns:
+        - !Sub 'arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy'
+        - !Sub 'arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore'
+        - !Sub 'arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess'
+      PermissionsBoundary: !Sub 'arn:aws:iam::${AWS::AccountId}:policy/T_PROJADMIN_U'
+
+  SyslogInstanceProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      InstanceProfileName: !Sub 'syslog-instance-profile-${AWS::StackId}'
+      Path: "/"
+      Roles:
+        - !Ref SyslogRole
+
+  SyslogLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        IamInstanceProfile:
+          Name: !Ref SyslogInstanceProfile
+        # ImageId: !Ref SyslogAMI
+        ImageId: !FindInMap [ RegionMap, !Ref 'AWS::Region', AMI ]
+        InstanceType: t2.micro
+        # KeyName: !Ref KeyName
+        SecurityGroupIds:
+          - !Ref SyslogTrafficSecurityGroup
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - Key: "Name"
+                Value: !Sub '${AWS::StackName} - rsyslogd'
+        UserData:
+          Fn::Base64:
+            !Sub |
+              #!/bin/bash -xe
+
+              #yum update -y
+              yum install jq python3 -y
+              pip3 install boto3
+
+              cd /tmp
+              aws s3 cp --quiet s3://${CodeBucket}/${SyslogConfigFiles} .
+
+              cd /etc
+              tar xvf /tmp/rsyslog-files.tar rsyslog.conf
+              chown -R root:root rsyslog.conf
+
+              cd /usr/local/bin
+              tar xvf /tmp/rsyslog-files.tar forward-to-cloudwatch.py
+              chown -R root:root forward-to-cloudwatch.py
+
+              systemctl enable --now rsyslog
+              sleep 10
+              systemctl restart rsyslog
+              ss -a | grep 20550
+
+  SyslogTargetGroupUDP:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Port: !Ref SyslogPort
+      Protocol: UDP
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 10
+      HealthyThresholdCount: 3
+      TargetType: instance
+      VpcId: !Ref InterfaceVpcId
+      Tags:
+        - Key: Name
+          Value: !Sub 'Cisco FMC logs'
+
+  SyslogAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      #AvailabilityZones: !Ref AvailabilityZones
+      Cooldown: 60
+      DesiredCapacity: 2
+      HealthCheckGracePeriod: 10
+      HealthCheckType: EC2
+      # InstanceId: String
+      LaunchTemplate:
+        LaunchTemplateId: !Ref SyslogLaunchTemplate
+        Version: !GetAtt SyslogLaunchTemplate.DefaultVersionNumber
+      MaxSize: 4
+      MinSize: 2
+      TargetGroupARNs:
+        - !Ref SyslogTargetGroupUDP
+      VPCZoneIdentifier: !Ref SyslogSubnets
+
+  SyslogListenerUDP:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref SyslogTargetGroupUDP
+      LoadBalancerArn: !Ref SyslogNetworkLoadBalancer
+      Port: !Ref SyslogPort
+      Protocol: UDP
+
+  SyslogNetworkLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Type: network
+      Scheme: internal
+      Subnets: !Ref SyslogSubnets
+
+  SyslogTrafficSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Inbound syslog traffic
+      VpcId: !Ref InterfaceVpcId
+      SecurityGroupIngress:
+      # remote syslog ports
+      # FMC sends audit data to udp 514
+      - IpProtocol: udp
+        FromPort: !Ref SyslogPort
+        ToPort: !Ref SyslogPort
+        CidrIp: !Ref SourcesCidrBlock
+      # allowing traffic on TCP 514 for NLB health check. not sure this works.
+      - IpProtocol: tcp
+        FromPort: !Ref SyslogPort
+        ToPort: !Ref SyslogPort
+        CidrIp: !Ref SourcesCidrBlock
+      # Allow all traffic from within the VPC.
+      # - IpProtocol: -1
+      #   CidrIp: !Ref SourcesCidrBlock
+      #   Description: Allow all traffic from within the VPC. Cisco seems to use additional ports and protocols.
+      Tags:
+        - Key: "Name"
+          Value: !Sub '${AWS::StackName} - syslog traffic'
