@@ -211,6 +211,7 @@ if __name__ == '__main__':
     else:
         logger = Logger(None)
 
+    region = None
     # check for region three ways, in this order
 
     # 1
