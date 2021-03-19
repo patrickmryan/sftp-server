@@ -1,4 +1,4 @@
-import sys
+import sys, os
 from datetime import datetime, timezone
 import boto3
 import json
@@ -175,6 +175,7 @@ class CwForwarder:
                     # (after the period specified by the action.resumeInterval parameter).
 
                     sys.stdout.write("OK\n")
+                    sys.stdout.flush()
 
             # except UnrecognizedClientException as err:
             #     logger.write(f'UnrecognizedClientException: {err}')
@@ -185,6 +186,7 @@ class CwForwarder:
 
                 logger.write(f"ERROR sending message to cloudwatch - {err}\n")
                 sys.stderr.write(f"ERROR: {err}\n")
+                sys.stderr.flush()
 
 # main program
 if __name__ == '__main__':
@@ -192,6 +194,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # https://docs.python.org/3/library/argparse.html
 
+    parser.add_argument("--region", help="AWS region",
+                        dest="region", required=False, default=None)
     parser.add_argument("--log-stream", help="name of CloudWatch log stream",
                         dest="log_stream", required=True)
     parser.add_argument("--log-group", help="name of CloudWatch log group",
@@ -207,20 +211,25 @@ if __name__ == '__main__':
     else:
         logger = Logger(None)
 
-    # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/
-    #   logs.html#CloudWatchLogs.Client.put_log_events
+    # check for region three ways, in this order
 
-    # first check for presence of $AWS_DEFAULT_REGION
+    # 1
+    if (args.region):
+        region = args.region
 
-    metadata = AwsMetadata()
+    # 2
+    if (not region):
+        region = os.environ.get('AWS_DEFAULT_REGION', None)
 
-    # grab the instance metadata so that we figure out what region we're in
-    az = metadata.get("placement/availability-zone")
-    result = re.match('^(\S+-\d)[a-z]$', az)   # extract the region name from the AZ name
-    region = result.group(1)
+    # 3
+    if (not region):
+        metadata = AwsMetadata()
+        # grab the instance metadata so that we figure out what region we're in
+        az = metadata.get("placement/availability-zone")
+        result = re.match('^(\S+-\d)[a-z]$', az)   # extract the region name from the AZ name
+        region = result.group(1)
+
     client = boto3.client('logs', region_name=region)
-
-
 
     cw_forwarder = CwForwarder(
                         logGroupName=args.log_group,

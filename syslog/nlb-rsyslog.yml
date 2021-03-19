@@ -52,7 +52,7 @@ Resources:
   SyslogRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub 'syslog-role-${AWS::StackId}'
+      RoleName: !Sub 'syslog-role-${AWS::StackName}'
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -70,10 +70,10 @@ Resources:
       PermissionsBoundary: !Sub 'arn:aws:iam::${AWS::AccountId}:policy/T_PROJADMIN_U'
 
   SyslogInstanceProfile:
-    Type: "AWS::IAM::InstanceProfile"
+    Type: AWS::IAM::InstanceProfile
     Properties:
-      InstanceProfileName: !Sub 'syslog-instance-profile-${AWS::StackId}'
-      Path: "/"
+      InstanceProfileName: !Sub 'syslog-instance-profile-${AWS::StackName}'
+      Path: /
       Roles:
         - !Ref SyslogRole
 
@@ -117,7 +117,7 @@ Resources:
               systemctl enable --now rsyslog
               sleep 10
               systemctl restart rsyslog
-              ss -a | grep 20550
+
 
   SyslogTargetGroupUDP:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
@@ -176,7 +176,6 @@ Resources:
       VpcId: !Ref InterfaceVpcId
       SecurityGroupIngress:
       # remote syslog ports
-      # FMC sends audit data to udp 514
       - IpProtocol: udp
         FromPort: !Ref SyslogPort
         ToPort: !Ref SyslogPort

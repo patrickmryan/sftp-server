@@ -8,7 +8,8 @@ def retrieve_data(http, url,depth):
     response = http.request('GET', url)
     text = response.data.decode('utf-8')
 
-    if (re.search('/$', url)):
+    #if (re.search('/$', url)):
+    if (url[-1] == '/'):
         # trailing slash means that the return value is an array
         for n in range(1, depth):
             sys.stdout.write(' ')
