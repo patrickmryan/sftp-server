@@ -21,12 +21,16 @@ class FileRetriever():
             scheme = matched.group('scheme')
             path = matched.group('path')
 
+        _class = None
         if (scheme == 'file'):
-            return LocalFile(scheme=scheme, path=path)
+            _class = LocalFile
         if (scheme == 's3'):
-            return AwsS3File(scheme=scheme, path=path)
+            _class = AwsS3File
         if (scheme == 'http' or scheme == 'https'):
-            return HttpFile(scheme=scheme, path=path)
+            _class = HttpFile
+
+        if (_class):
+            return _class(scheme=scheme, path=path)
 
         # if we got here, there's a scheme but I dont recognize it
         raise Exception(f'{address}: no parser for scheme {scheme}')
@@ -42,7 +46,6 @@ class AwsS3File(FileRetriever):
 
 class HttpFile(FileRetriever):
     pass
-
 
 
 if __name__ == "__main__":
