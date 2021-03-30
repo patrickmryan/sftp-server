@@ -99,6 +99,9 @@ Resources:
             !Sub |
               #!/bin/bash -xe
 
+              # force UTC timezone
+              ln -sf /usr/share/zoneinfo/UTC /etc/localtime
+
               #yum update -y
               yum install jq python3 -y
               pip3 install boto3

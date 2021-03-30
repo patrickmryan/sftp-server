@@ -28,6 +28,8 @@ class Logger:
             self.debug_file.write(message)
             self.debug_file.flush()
         return
+    def print(self, message):
+        self.write(f'{message}\n')
     def write(self, message):
         return self.log(message)
     def close(self):
@@ -65,7 +67,6 @@ class CwForwarder:
         self.logger=logger
         self.client = boto3.client('logs', region_name=region)
 
-
     def nextSequenceToken(self, logStreamForEvent):
 
         response = self.client.describe_log_streams(
@@ -86,7 +87,7 @@ class CwForwarder:
     def forwardSyslogToCloudWatch(self):
 
         # compiled regex to remove extraneous whitespace
-        no_whitespace = re.compile('^\s*(\S.*\S)\s*$')
+        ##no_whitespace = re.compile('^\s*(\S.*\S)\s*$')
 
         for line in sys.stdin:
             logger.write(line)
@@ -123,17 +124,12 @@ class CwForwarder:
                     logger.write(f'could not parse date string "{timestamp_string}", defaulting to current time\n')
                     event_timestamp = datetime.now(timezone.utc)
 
-                # convert to milliseconds
-                epoch_ms = int((event_timestamp.timestamp())*1000.0)
+                ##result = no_whitespace.match(parsed['rawmsg'])  # remove leading and trailing whitespace
+                message = (parsed['rawmsg']).strip()  # remove leading and trailing whitespace
 
-                # using rawmsg instead of msg
-                result = no_whitespace.match(parsed['rawmsg'])  # remove leading and trailing whitespace
-                # rawmsg might be blank. have to send something as put_log_events will
-                # fail if the message is zero length
+                # rawmsg might be blank. have to send something as put_log_events will fail if the message is zero length
 
-                if (result):
-                    message = result.group(1)
-                else:
+                if (not message):
                     # got a blank message, which is weird.
                     # convey info about what host sent the blank messsage
                     message = 'blank message'
@@ -145,7 +141,9 @@ class CwForwarder:
             else: # JSON parsing failed. construct a message to be passed
                 message = json_message
                 event_timestamp = datetime.now(timezone.utc)
-                epoch_ms = int((event_timestamp.timestamp())*1000.0)
+
+            # convert to milliseconds
+            epoch_ms = int((event_timestamp.timestamp())*1000.0)
 
             try:
                 # send the syslog event to CloudWatch
@@ -184,7 +182,7 @@ class CwForwarder:
             except ClientError as err:
                 # Need to cleanly handle failure to send message
 
-                logger.write(f"ERROR sending message to cloudwatch - {err}\n")
+                logger.print(f"ERROR sending message to cloudwatch - {err}")
                 sys.stderr.write(f"ERROR: {err}\n")
                 sys.stderr.flush()
 
