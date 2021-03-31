@@ -1,5 +1,8 @@
-import re, sys, boto3, argparse, pdb
+#
+#
+#
 
+import re, sys, boto3, argparse, urllib3, pdb
 
 
 class FileRetriever():
@@ -11,14 +14,17 @@ class FileRetriever():
         return f'{self.__class__} scheme={self.scheme} path={self.path}'
 
     @staticmethod
-    def retrieverClass(address):
-        matched = re.match(r'^(?P<scheme>[^/:]+)://(?P<path>.*)$', address)
+    def retrieverFor(address):
+        # https://tools.ietf.org/html/rfc3986#section-3.1
+
+        # matched = re.match(r'^(?P<scheme>[^/:]+)://(?P<path>.*)$', address)
+        matched = re.match(r'^(?P<scheme>[A-Za-z][\w+-.]*)://(?P<path>.*)$', address)
 
         if (not matched):   # no scheme implies this is a local file
             scheme = 'file'
             path = address
         else:
-            scheme = matched.group('scheme')
+            scheme = matched.group('scheme').lower()
             path = matched.group('path')
 
         _class = None
@@ -39,13 +45,36 @@ class FileRetriever():
         pass
 
 class LocalFile(FileRetriever):
-    pass
+    def retrieveContent(self):
+        fp = open(self.path,'r')
+        content = fp.read()
+        fp.close()
+        return content
 
 class AwsS3File(FileRetriever):
-    pass
+    def retrieveContent(self):
+        s3_client = boto3.client('s3')
+
+        elements = self.path.split('/')  # self.path will be of the form "bucket/this/is/key.txt"
+        bucket = elements[0]             # bucket name is the first element of the path
+        key = '/'.join(elements[1:])     # key is everything eles
+
+        try:
+            response = s3_client.get_object(Bucket=bucket, Key=key)
+            bytes = response['Body'].read()
+            return bytes.decode("utf-8")
+
+        except s3_client.exceptions.NoSuchBucket as e:
+            print(f'{bucket}: could not access bucket - {e}')
+            raise
+
+        except s3_client.exceptions.NoSuchKey as e:
+            print(f'could not find {key} in {bucket}- {e}')
+            raise
 
 class HttpFile(FileRetriever):
-    pass
+    def retrieveContent(self):
+        pass
 
 
 if __name__ == "__main__":
@@ -54,7 +83,7 @@ if __name__ == "__main__":
     parser.add_argument('--file', dest='file', required=True)
     args = parser.parse_args()
 
-    retriever = FileRetriever.retrieverClass(args.file)
-    print(retriever)
+    retriever = FileRetriever.retrieverFor(args.file)
 
-    # main(directory=args.directory, git_only=args.git_only, dryrun=args.dryrun)
+    print(f'content of {args.file}')
+    print(retriever.retrieveContent())
