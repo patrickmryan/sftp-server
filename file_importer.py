@@ -2,7 +2,10 @@
 #
 #
 
-import re, sys, boto3, argparse, urllib3, pdb
+import re, sys, argparse
+import boto3
+import urllib3, ssl
+import pdb
 
 
 class FileRetriever():
@@ -12,6 +15,13 @@ class FileRetriever():
 
     def __str__(self):
         return f'{self.__class__} scheme={self.scheme} path={self.path}'
+
+    def retrieveContent(self):
+        pass
+
+    @staticmethod
+    def schemes():
+        return []
 
     @staticmethod
     def retrieverFor(address):
@@ -27,27 +37,21 @@ class FileRetriever():
             scheme = matched.group('scheme').lower()
             path = matched.group('path')
 
-        _class = None
-
-        # iterate over FileRetriever.__subclasses__()
-
-        if (scheme == 'file'):
-            _class = LocalFile
-        if (scheme == 's3'):
-            _class = AwsS3File
-        if (scheme == 'http' or scheme == 'https'):
-            _class = HttpFile
+        # Traverse the subclasses. See which one willl handle this URL scheme
+        _class = next((aClass for aClass in FileRetriever.__subclasses__() if (scheme in aClass.schemes())), None)
 
         if (_class):
             return _class(scheme=scheme, path=path)
 
-        # if we got here, there's a scheme but I dont recognize it
+        # if we got here, there's a scheme but I don't recognize it
         raise Exception(f'{address}: no parser for scheme {scheme}')
 
-    def retrieveContent(self):
-        pass
 
 class LocalFile(FileRetriever):
+    @staticmethod
+    def schemes():
+        return [ 'file' ]
+
     def retrieveContent(self):
         fp = open(self.path,'r')
         content = fp.read()
@@ -55,6 +59,10 @@ class LocalFile(FileRetriever):
         return content
 
 class AwsS3File(FileRetriever):
+    @staticmethod
+    def schemes():
+        return [ 's3' ]
+
     def retrieveContent(self):
         s3_client = boto3.client('s3')
 
@@ -76,17 +84,27 @@ class AwsS3File(FileRetriever):
             raise
 
 class HttpFile(FileRetriever):
+    @staticmethod
+    def schemes():
+        return [ 'http', 'https' ]
+
     def retrieveContent(self):
-        pass
+
+        urllib3.disable_warnings()
+        http = urllib3.PoolManager(cert_reqs = ssl.CERT_NONE)
+        url = f'{self.scheme}://{self.path}'
+        response = http.request('GET', url)  # headers=...
+
+        return response.data.decode()   #'utf-8'
 
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--file', dest='file', required=True)
+    parser.add_argument('--target', dest='target', required=True)
     args = parser.parse_args()
 
-    retriever = FileRetriever.retrieverFor(args.file)
+    retriever = FileRetriever.retrieverFor(args.target)
 
-    print(f'content of {args.file}')
+    print(f'content of {args.target}')
     print(retriever.retrieveContent())
