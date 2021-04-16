@@ -1,0 +1,73 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "The analyzer-instance role is allowed to get objects.",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::458358814065:role/analyzer-instance"
+      },
+      "Action": [
+        "s3:GetObject*"
+      ],
+      "Resource": [
+        "arn:aws:s3:::galactica-test-vault/*"
+      ]
+    },
+    {
+      "Sid": "The analyzer-instance role is denied the ability of putting objects.",
+      "Effect": "Deny",
+      "Principal": {
+        "AWS": "arn:aws:iam::458358814065:role/analyzer-instance"
+      },
+      "Action": [
+        "s3:Put*",
+        "s3:Delete*",
+        "s3:List*"
+      ],
+      "Resource": [
+        "arn:aws:s3:::galactica-test-vault",
+        "arn:aws:s3:::galactica-test-vault/*"
+      ]
+    },
+    {
+      "Sid": "The T_PROJADMIN_U role can create and delete objects.",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::458358814065:role/T_PROJADMIN_U"
+      },
+      "Action": [
+        "s3:Get*",
+        "s3:Put*",
+        "s3:Delete*",
+        "s3:List*"
+      ],
+      "Resource": [
+        "arn:aws:s3:::galactica-test-vault",
+        "arn:aws:s3:::galactica-test-vault/*"
+      ]
+    },
+    {
+      "Sid": "If you are not one of the approved principals, all s3 actions are denied.",
+      "Effect": "Deny",
+      "Principal": {
+        "AWS": "*"
+      },
+      "Action": [
+        "s3:*"
+      ],
+      "Resource": [
+        "arn:aws:s3:::galactica-test-vault",
+        "arn:aws:s3:::galactica-test-vault/*"
+      ],
+      "Condition": {
+        "StringNotEquals": {
+          "aws:PrincipalArn": [
+            "arn:aws:iam::458358814065:role/analyzer-instance",
+            "arn:aws:iam::458358814065:role/T_PROJADMIN_U"
+          ]
+        }
+      }
+    }
+  ]
+}

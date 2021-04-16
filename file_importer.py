@@ -28,6 +28,9 @@ class FileRetriever():
             path = matched.group('path')
 
         _class = None
+
+        # iterate over FileRetriever.__subclasses__()
+
         if (scheme == 'file'):
             _class = LocalFile
         if (scheme == 's3'):
@@ -57,19 +60,19 @@ class AwsS3File(FileRetriever):
 
         elements = self.path.split('/')  # self.path will be of the form "bucket/this/is/key.txt"
         bucket = elements[0]             # bucket name is the first element of the path
-        key = '/'.join(elements[1:])     # key is everything eles
+        key = '/'.join(elements[1:])     # key is everything else
 
         try:
             response = s3_client.get_object(Bucket=bucket, Key=key)
             bytes = response['Body'].read()
-            return bytes.decode("utf-8")
+            return bytes.decode()
 
         except s3_client.exceptions.NoSuchBucket as e:
             print(f'{bucket}: could not access bucket - {e}')
             raise
 
         except s3_client.exceptions.NoSuchKey as e:
-            print(f'could not find {key} in {bucket}- {e}')
+            print(f'{key}: could not find in {bucket} - {e}')
             raise
 
 class HttpFile(FileRetriever):
