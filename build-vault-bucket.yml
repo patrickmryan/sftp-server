@@ -1,0 +1,73 @@
+
+AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+  VaultBucketName:
+    Type: String
+  VaultReadOnlyRoleName:
+    Type: String
+  VaultMaintenanceRoleName:
+    Type: String
+  SuperuserRoleName:
+    Type: String
+
+Resources:
+  VaultBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref VaultBucketName
+
+  VaultBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref VaultBucket
+      PolicyDocument:
+        Statement:
+          - Action:
+              - 's3:Get*'
+            Effect: Allow
+            Principal:
+              'AWS': !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${VaultReadOnlyRoleName}'
+            Resource: !Sub '${VaultBucket.Arn}/*'
+
+          - Action:
+              - 's3:Put*'
+              - 's3:Delete*'
+              - 's3:List*'
+            Effect: Deny
+            Principal:
+              'AWS': !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${VaultReadOnlyRoleName}'
+            Resource:
+              - !Sub '${VaultBucket.Arn}/*'
+              - !Sub '${VaultBucket.Arn}'
+
+          - Action:
+              - 's3:Get*'
+              - 's3:Put*'
+              - 's3:Delete*'
+              - 's3:List*'
+            Effect: Allow
+            Principal:
+              'AWS': !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${VaultMaintenanceRoleName}'
+            Resource:
+              - !Sub '${VaultBucket.Arn}/*'
+              - !Sub '${VaultBucket.Arn}'
+
+          - Action:
+              - 's3:*'
+            Effect: Deny
+            Principal: '*'
+            Resource:
+              - !Sub '${VaultBucket.Arn}/*'
+              - !Sub '${VaultBucket.Arn}'
+            Condition:
+              StringNotEquals:
+                'aws:PrincipalArn':
+                  - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${VaultReadOnlyRoleName}'
+                  - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${VaultMaintenanceRoleName}'
+                  - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${SuperuserRoleName}'
+
+
+Outputs:
+  VaultBucket:
+    Value: !Ref VaultBucket
