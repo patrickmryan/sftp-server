@@ -1,6 +1,6 @@
 #
 #
-#
+# python3 file_importer.py --uri s3://pmryan-galactica-code/vault-s3-policy.json
 
 import re, sys, argparse
 import boto3
@@ -14,7 +14,7 @@ class FileRetriever():
         self.path = path
 
     def __str__(self):
-        return f'{self.__class__} scheme={self.scheme} path={self.path}'
+        return f'{self.__class__} {self.scheme}://{self.path}'
 
     def retrieveContent(self):
         pass
@@ -27,24 +27,26 @@ class FileRetriever():
     def retrieverFor(address):
         # https://tools.ietf.org/html/rfc3986#section-3.1
 
-        # matched = re.match(r'^(?P<scheme>[^/:]+)://(?P<path>.*)$', address)
         matched = re.match(r'^(?P<scheme>[A-Za-z][\w+-.]*)://(?P<path>.*)$', address)
 
-        if (not matched):   # no scheme implies this is a local file
-            scheme = 'file'
-            path = address
-        else:
+        if (matched):
             scheme = matched.group('scheme').lower()
             path = matched.group('path')
 
-        # Traverse the subclasses. See which one willl handle this URL scheme
-        _class = next((aClass for aClass in FileRetriever.__subclasses__() if (scheme in aClass.schemes())), None)
+        else:  # no scheme implies this is a local file
+            scheme = 'file'
+            path = address
 
-        if (_class):
-            return _class(scheme=scheme, path=path)
+        # Traverse the subclasses. See which one will handle this URL scheme
+        retriever_class = next((_class for _class in FileRetriever.__subclasses__()
+                                if (scheme in _class.schemes())), None)
 
-        # if we got here, there's a scheme but I don't recognize it
-        raise Exception(f'{address}: no parser for scheme {scheme}')
+        if (not retriever_class):
+            # if we got here, there's a scheme but I don't recognize it
+            raise Exception(f'{address}: no parser for scheme {scheme}')
+
+        # Return an instance of the class that will handle an address of the specified scheme.
+        return retriever_class(scheme=scheme, path=path)
 
 
 class LocalFile(FileRetriever):
@@ -101,10 +103,8 @@ class HttpFile(FileRetriever):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--target', dest='target', required=True)
+    parser.add_argument('--uri', dest='uri', required=True)
     args = parser.parse_args()
 
-    retriever = FileRetriever.retrieverFor(args.target)
-
-    print(f'content of {args.target}')
+    retriever = FileRetriever.retrieverFor(args.uri)
     print(retriever.retrieveContent())
