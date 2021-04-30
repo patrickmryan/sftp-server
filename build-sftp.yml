@@ -1,0 +1,46 @@
+
+AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+  # LoggingRoleARN:
+  #   Type: String
+  #   AllowedPattern: arn:.*role/.*
+  SftpUserName:
+    Type: String
+  UserRoleARN:
+    Type: String
+    AllowedPattern: arn:.*role/.*
+  SftpUserPublicKey:
+    Type: String
+
+Resources:
+
+  SftpServer:
+    Type: AWS::Transfer::Server
+    Properties:
+      EndpointType: PUBLIC
+      # LoggingRole: !Ref LoggingRoleARN
+      Protocols:
+        - SFTP
+
+  SftpUser:
+    Type: AWS::Transfer::User
+    Properties:
+      UserName: !Ref SftpUserName
+      Role: !Ref UserRoleARN
+      ServerId: !GetAtt SftpServer.ServerId
+      SshPublicKeys:
+        - !Ref SftpUserPublicKey
+      Policy:
+        Version: '2012-10-17T00:00:00.000Z'
+        Statement:
+          Sid: AllowFullAccessToBucket
+          Action: 's3:*'
+          Effect: Allow
+          Resource: !Sub '${SftpBucket.Arn}/*'
+
+
+  SftpBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${SftpUserName}-sftp-${AWS::StackName}'
