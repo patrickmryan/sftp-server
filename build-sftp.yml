@@ -12,6 +12,7 @@ Parameters:
     AllowedPattern: arn:.*role/.*
   SftpUserPublicKey:
     Type: String
+    AllowedPattern: '^ssh-rsa.*'
 
 Resources:
 
@@ -23,24 +24,29 @@ Resources:
       Protocols:
         - SFTP
 
+  # create role with permission boundary. and line policy allowing
+  # 'transfers' to access the bucket
+
   SftpUser:
     Type: AWS::Transfer::User
+    DependsOn: SftpBucket
     Properties:
       UserName: !Ref SftpUserName
       Role: !Ref UserRoleARN
+      HomeDirectoryType: PATH
+      HomeDirectory: !Sub '/${SftpBucket}/upload'
       ServerId: !GetAtt SftpServer.ServerId
       SshPublicKeys:
         - !Ref SftpUserPublicKey
-      Policy:
-        Version: '2012-10-17T00:00:00.000Z'
-        Statement:
-          Sid: AllowFullAccessToBucket
-          Action: 's3:*'
-          Effect: Allow
-          Resource: !Sub '${SftpBucket.Arn}/*'
-
+      # Policy:
+      #   Version: '2012-10-17T00:00:00.000Z'
+      #   Statement:
+      #     # Sid: AllowFullAccessToBucket
+      #     Action: 's3:*'
+      #     Effect: Allow
+      #     Resource: !Sub '${SftpBucket.Arn}/*'
 
   SftpBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub '${SftpUserName}-sftp-${AWS::StackName}'
+      BucketName: !Sub 'sftp-${SftpUserName}-${AWS::StackName}'
