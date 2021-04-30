@@ -1,52 +1,97 @@
+#
+#
+# Build an SFTP server using AWS Transfer.
+#
+# The only prereq is to have a both files for a key pair, .pem and .pub. The value for
+# the SftpUserPublicKey parameters is the content of the .pub file.
+#
+# patrick.ryan@evanschambers.com
+#
 
 AWSTemplateFormatVersion: '2010-09-09'
 
 Parameters:
-  # LoggingRoleARN:
-  #   Type: String
-  #   AllowedPattern: arn:.*role/.*
   SftpUserName:
     Type: String
-  UserRoleARN:
+    Default: uploader
+  BoundaryPolicyName:
     Type: String
-    AllowedPattern: arn:.*role/.*
+    Default: T_PROJADMIN_U
   SftpUserPublicKey:
     Type: String
     AllowedPattern: '^ssh-rsa.*'
 
 Resources:
 
+  SftpBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'sftp-${SftpUserName}-${AWS::StackName}'
+
   SftpServer:
     Type: AWS::Transfer::Server
     Properties:
       EndpointType: PUBLIC
-      # LoggingRole: !Ref LoggingRoleARN
       Protocols:
         - SFTP
 
-  # create role with permission boundary. and line policy allowing
-  # 'transfers' to access the bucket
+  SftpUserRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'sftp-user-role-${AWS::StackName}'
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - transfer.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      PermissionsBoundary: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/${BoundaryPolicyName}'
+      Policies:
+        - PolicyName: !Sub 'sftp-user-policy-${AWS::StackName}'
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                # Action: 's3:*'
+                Action:
+                  - s3:Put*
+                  # - s3:Get*
+                Resource: !Sub '${SftpBucket.Arn}/*'
+              - Effect: Allow
+                Action:
+                  - s3:List*
+                Resource: !Sub '${SftpBucket.Arn}'
+              - Effect: Allow
+                Action: 'events:*'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:DescribeLogStreams
+                  - logs:CreateLogGroup
+                  - logs:PutLogEvents
+                Resource: '*'
 
   SftpUser:
     Type: AWS::Transfer::User
     DependsOn: SftpBucket
     Properties:
       UserName: !Ref SftpUserName
-      Role: !Ref UserRoleARN
+      Role: !GetAtt SftpUserRole.Arn
       HomeDirectoryType: PATH
       HomeDirectory: !Sub '/${SftpBucket}/upload'
       ServerId: !GetAtt SftpServer.ServerId
       SshPublicKeys:
         - !Ref SftpUserPublicKey
-      # Policy:
-      #   Version: '2012-10-17T00:00:00.000Z'
-      #   Statement:
-      #     # Sid: AllowFullAccessToBucket
-      #     Action: 's3:*'
-      #     Effect: Allow
-      #     Resource: !Sub '${SftpBucket.Arn}/*'
 
+Outputs:
+  SftpUserName:
+    Value: SftpUserName
+  SftpServerAddress:
+    Value: !Sub '${SftpServer.ServerId}.server.transfer.${AWS::Region}.amazonaws.com'
   SftpBucket:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketName: !Sub 'sftp-${SftpUserName}-${AWS::StackName}'
+    Value: !Ref SftpBucket
