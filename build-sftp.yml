@@ -10,6 +10,24 @@
 
 AWSTemplateFormatVersion: '2010-09-09'
 
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: Parameters for sftp server
+        Parameters:
+          - SftpUserName
+          - BoundaryPolicyName
+          - SftpUserPublicKey
+
+    ParameterLabels:
+      SftpUserName:
+        default: Username for when connecting via sftp
+      BoundaryPolicyName:
+        default: Name of policy used as the boundary for the IAM role
+      SftpUserPublicKey:
+        default: The public key of the key pair. Will start with ssh-rsa
+
 Parameters:
   SftpUserName:
     Type: String
@@ -83,15 +101,15 @@ Resources:
       UserName: !Ref SftpUserName
       Role: !GetAtt SftpUserRole.Arn
       HomeDirectoryType: PATH
-      HomeDirectory: !Sub '/${SftpBucket}/upload'
+      HomeDirectory: !Sub '/${SftpBucket}/${SftpUserName}'
       ServerId: !GetAtt SftpServer.ServerId
       SshPublicKeys:
         - !Ref SftpUserPublicKey
 
 Outputs:
   SftpUserName:
-    Value: SftpUserName
+    Value: !Ref SftpUserName
   SftpServerAddress:
     Value: !Sub '${SftpServer.ServerId}.server.transfer.${AWS::Region}.amazonaws.com'
   SftpBucket:
-    Value: !Ref SftpBucket
+    Value: !Sub 's3://${SftpBucket}'
