@@ -20,6 +20,7 @@ Metadata:
           - SftpUserName
           - BoundaryPolicyName
           - SftpUserPublicKey
+          - CidrRange
 
     ParameterLabels:
       VpcId:
@@ -41,6 +42,8 @@ Parameters:
   SftpUserName:
     Type: String
     Default: uploader
+  CidrRange:
+    Type: String
   BoundaryPolicyName:
     Type: String
     Default: T_PROJADMIN_U
@@ -55,6 +58,31 @@ Resources:
     Properties:
       BucketName: !Sub 'sftp-${AWS::StackName}'
 
+  # SNS topic
+  NewObjectSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub 'new-object-topic-${SftpBucket}'
+
+  # policy that allows S3 to publish to topic
+  AllowS3ToSendToSNS:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+        - !Ref NewObjectSNSTopic
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: "*"
+            Action:
+            - sns:Publish
+            Resource: !Ref NewObjectSNSTopic
+            Condition:
+              ArnLike:
+                aws:SourceArn: !Sub 'arn:${AWS::Partition}:s3:::${SftpBucket}'
+
+
 
   AllowedPrefixList:
     Type: AWS::EC2::PrefixList
@@ -63,7 +91,8 @@ Resources:
       AddressFamily: IPv4 
       MaxEntries: 8
       Entries:
-        - Cidr: "10.10.0.0/16"
+        - Cidr: !Ref CidrRange
+        # - Cidr: "10.10.0.0/16"
         # - Cidr: "3.235.109.106/32"
       Tags:
         - Key: Name
