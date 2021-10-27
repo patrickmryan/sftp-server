@@ -53,7 +53,7 @@ Resources:
   SftpBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub 'sftp-${SftpUserName}-${AWS::StackName}'
+      BucketName: !Sub 'sftp-${AWS::StackName}'
 
 
   AllowedPrefixList:
@@ -65,23 +65,27 @@ Resources:
       Entries:
         - Cidr: "10.10.0.0/16"
         # - Cidr: "3.235.109.106/32"
-      # Tags: 
-      #   - Tag
+      Tags:
+        - Key: Name
+          Value: !Sub 'allowed-addresses-${AWS::StackName}'
 
   AllowedSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties: 
-      GroupDescription: Addresses allowed to connecto to sftp
+      GroupDescription: Addresses allowed to connect to sftp
       SecurityGroupIngress: 
         - SourcePrefixListId: !Ref AllowedPrefixList
           FromPort: 22  # sftp
           ToPort: 22
           IpProtocol: tcp
-
+      Tags:
+        - Key: Name
+          Value: !Sub 'allowed-addresses-${AWS::StackName}'
+      
   SftpServer:
     Type: AWS::Transfer::Server
     Properties:
-      EndpointType: VPC   #PUBLIC
+      EndpointType: VPC
       EndpointDetails:
         AddressAllocationIds: 
           - !GetAtt SftpPublicIp1.AllocationId
@@ -92,7 +96,6 @@ Resources:
           - !Ref SubnetId2
         SecurityGroupIds: 
           - !GetAtt AllowedSecurityGroup.GroupId
-        # VpcEndpointId: String
       Protocols:
         - SFTP
 
