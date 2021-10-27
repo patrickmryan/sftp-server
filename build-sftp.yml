@@ -82,7 +82,38 @@ Resources:
               ArnLike:
                 aws:SourceArn: !Sub 'arn:${AWS::Partition}:s3:::${SftpBucket}'
 
+  # SQS Q
+  NewObjectQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'new-object-queue-${SftpBucket}'
 
+  # policy that allows SNS to sendMessage to the Q
+  NewObjectQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref NewObjectQueue
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: "*"
+            Action:
+            - sqs:SendMessage
+            Resource: !GetAtt NewObjectQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref NewObjectSNSTopic
+
+  # SQS subscription to SNS topic
+  SubscribeSQStoNewObjectSNSTopic:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Endpoint: !GetAtt NewObjectQueue.Arn
+      Protocol: sqs
+      RawMessageDelivery: true
+      TopicArn: !Ref NewObjectSNSTopic
 
   AllowedPrefixList:
     Type: AWS::EC2::PrefixList
