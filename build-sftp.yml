@@ -16,11 +16,14 @@ Metadata:
       - Label:
           default: Parameters for sftp server
         Parameters:
+          - VpcId
           - SftpUserName
           - BoundaryPolicyName
           - SftpUserPublicKey
 
     ParameterLabels:
+      VpcId:
+        default: VPC for the sftp server
       SftpUserName:
         default: Username for when connecting via sftp
       BoundaryPolicyName:
@@ -29,6 +32,12 @@ Metadata:
         default: The public key of the key pair. Will start with ssh-rsa
 
 Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  SubnetId1:
+    Type: AWS::EC2::Subnet::Id
+  SubnetId2:
+    Type: AWS::EC2::Subnet::Id
   SftpUserName:
     Type: String
     Default: uploader
@@ -46,12 +55,56 @@ Resources:
     Properties:
       BucketName: !Sub 'sftp-${SftpUserName}-${AWS::StackName}'
 
+
+  AllowedPrefixList:
+    Type: AWS::EC2::PrefixList
+    Properties: 
+      PrefixListName: mission-ridge-uploaders
+      AddressFamily: IPv4 
+      MaxEntries: 8
+      Entries:
+        - Cidr: "10.10.0.0/16"
+        # - Cidr: "3.235.109.106/32"
+      # Tags: 
+      #   - Tag
+
+  AllowedSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: Addresses allowed to connecto to sftp
+      SecurityGroupIngress: 
+        - SourcePrefixListId: !Ref AllowedPrefixList
+          FromPort: 22  # sftp
+          ToPort: 22
+          IpProtocol: tcp
+
   SftpServer:
     Type: AWS::Transfer::Server
     Properties:
-      EndpointType: PUBLIC
+      EndpointType: VPC   #PUBLIC
+      EndpointDetails:
+        AddressAllocationIds: 
+          - !GetAtt SftpPublicIp1.AllocationId
+          - !GetAtt SftpPublicIp2.AllocationId
+        VpcId: !Ref VpcId
+        SubnetIds: 
+          - !Ref SubnetId1
+          - !Ref SubnetId2
+        SecurityGroupIds: 
+          - !GetAtt AllowedSecurityGroup.GroupId
+        # VpcEndpointId: String
       Protocols:
         - SFTP
+
+  SftpPublicIp1:
+    Type: AWS::EC2::EIP
+    Properties: 
+      Domain: vpc
+
+  SftpPublicIp2:
+    Type: AWS::EC2::EIP
+    Properties: 
+      Domain: vpc
 
   SftpUserRole:
     Type: AWS::IAM::Role
