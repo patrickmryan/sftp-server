@@ -17,6 +17,8 @@ Metadata:
           default: Parameters for sftp server
         Parameters:
           - VpcId
+          - SubnetId1
+          - SubnetId2
           - SftpUserName
           - BoundaryPolicyName
           - SftpUserPublicKey
@@ -25,12 +27,18 @@ Metadata:
     ParameterLabels:
       VpcId:
         default: VPC for the sftp server
+      SubnetId1:
+        default: A public subnet
+      SubnetId2:
+        default: A public subnet
       SftpUserName:
         default: Username for when connecting via sftp
       BoundaryPolicyName:
         default: Name of policy used as the boundary for the IAM role
       SftpUserPublicKey:
         default: The public key of the key pair. Will start with ssh-rsa
+      CidrRange:
+        default: CIDR range from which sftp connections will be allowed (additional ranges can be added later)
 
 Parameters:
   VpcId:
