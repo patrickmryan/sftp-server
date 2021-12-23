@@ -1,7 +1,8 @@
 from aws_cdk import (
     Duration,
     Stack,
-    aws_sqs as sqs,
+    # aws_sqs as sqs,
+    aws_lambda as _lambda,
     # aws_iam as iam,
 )
 from constructs import Construct
@@ -14,11 +15,13 @@ class UdlStack(Stack):
         # permissions_boundary=iam.ManagedPolicy.from_managed_policy_name(self, 'PermissionBoundaryLambda', "T_PROJADMIN_U")
         # iam.PermissionsBoundary.of(self).apply(permissions_boundary)
 
-
-        # The code that defines your stack goes here
-
-        # example resource
-        queue = sqs.Queue(
-            self, "UdlQueue",
-            visibility_timeout=Duration.seconds(300),
-        )
+        read_udl_lambda = _lambda.Function(
+                self, 'UdlRead',
+                runtime=_lambda.Runtime.PYTHON_3_7,
+                code=_lambda.Code.from_asset('udl_read'),
+                handler='udl_read.handler',
+                environment= {
+                    'CREDENTIAL' : 'cGF0cmljay5yeWFuOlRheWwwclN3aWZ0ITIwMjI='
+                }
+                # role=lambda_role
+            )
