@@ -12,25 +12,23 @@ class UdlStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # permissions_boundary=iam.ManagedPolicy.from_managed_policy_name(self, 'PermissionBoundaryLambda', "T_PROJADMIN_U")
-        # iam.PermissionsBoundary.of(self).apply(permissions_boundary)
-
-
-        # pandas_layer = _lambda.PythonLayerVersion(
-        #         self, 'PandasLayer',
-                
-        #         compatible_runtimes=[_lambda.Runtime.PYTHON_3_8],
-        #         description='pandas library',
-        #         )
+        runtime = _lambda.Runtime.PYTHON_3_9
+        
+        pandas_layer = _lambda.LayerVersion(
+                self, 'PandasLayer',
+                code=_lambda.Code.from_asset('layer'),
+                compatible_runtimes=[runtime],
+                description='pandas library',
+                )
 
         read_udl_lambda = _lambda.Function(
                 self, 'UdlRead',
-                runtime=_lambda.Runtime.PYTHON_3_7,
+                runtime=runtime,
                 code=_lambda.Code.from_asset('udl_read'),
                 handler='udl_read.lambda_handler',
                 environment= {
                     'CREDENTIAL' : 'cGF0cmljay5yeWFuOlRheWwwclN3aWZ0ITIwMjI='
                 },
-                # layers = [ pandas_layer ]
+                layers = [ pandas_layer ]
                 # role=lambda_role
             )
