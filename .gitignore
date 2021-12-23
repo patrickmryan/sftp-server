@@ -5,3 +5,5 @@
 *.pdw
 *.scr
 *.tar
+*.pub
+*.pem
