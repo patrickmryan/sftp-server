@@ -18,7 +18,7 @@ class UdlStack(Stack):
                 description="Access credentials encoded using base64")
 
         runtime = _lambda.Runtime.PYTHON_3_9
-        
+
         pandas_layer = _lambda.LayerVersion(
                 self, 'PandasLayer',
                 code=_lambda.Code.from_asset('layer'),
