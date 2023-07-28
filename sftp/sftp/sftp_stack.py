@@ -53,6 +53,29 @@ class SftpStack(Stack):
 
         # vpc_endpoint = ec2.VpcEndpoint(self, 'VpcEndpoint')
 
+        logging_role = iam.Role(
+            self,
+            "LoggingRole",
+            assumed_by=iam.ServicePrincipal("transfer.amazonaws.com"),
+            inline_policies={
+                "logs": iam.PolicyDocument(
+                    assign_sids=True,
+                    statements=[
+                        iam.PolicyStatement(
+                            effect=iam.Effect.ALLOW,
+                            # principals=[iam.AnyPrincipal()],  # change to restrict to server
+                            actions=[
+                                "logs:CreateLogGroup",
+                                "logs:CreateLogStream",
+                                "logs:PutLogEvents",
+                            ],
+                            resources=["*"],
+                        )
+                    ]
+                )
+            },
+        )
+
         vpc_endpoint = ec2.CfnVPCEndpoint(
             self,
             "VpcEndpoint",
@@ -73,8 +96,9 @@ class SftpStack(Stack):
                 # vpc_endpoint_id=vpc_endpoint.ref,
                 # address_allocation_ids=["addressAllocationIds"],
             ),
-            endpoint_type="VPC",  # nope 'VPC_ENDPOINT',
+            endpoint_type="VPC",
             protocols=["SFTP"],
+            logging_role=logging_role.role_arn,
         )
 
 

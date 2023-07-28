@@ -65,96 +65,28 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub 'sftp-${AWS::StackName}'
-      NotificationConfiguration:
-        TopicConfigurations:
-        - Topic: !Ref NewObjectSNSTopic
-          Event: 's3:ObjectCreated:*'
-          # Filter:
-          #   S3Key:
-          #     Rules:
-          #       - Name: prefix
-          #         Value:
-          #       - Name: suffix
-          #         Value: .pdw
-          
-  
-  # SNS topic
-  NewObjectSNSTopic:
-    Type: AWS::SNS::Topic
-    Properties:
-      TopicName: !Sub 'new-object-topic-${AWS::StackName}'
-
-  # policy that allows S3 to publish to topic
-  AllowS3ToSendToSNS:
-    Type: AWS::SNS::TopicPolicy
-    Properties:
-      Topics:
-        - !Ref NewObjectSNSTopic
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal: "*"
-            Action:
-            - sns:Publish
-            Resource: !Ref NewObjectSNSTopic
-            Condition:
-              ArnLike:
-                aws:SourceArn: !Sub 'arn:${AWS::Partition}:s3:::sftp-${AWS::StackName}'
-
-  # SQS Q
-  NewObjectQueue:
-    Type: AWS::SQS::Queue
-    Properties:
-      QueueName: !Sub 'new-object-queue-${SftpBucket}'
-
-  # policy that allows SNS to sendMessage to the Q
-  NewObjectQueuePolicy:
-    Type: AWS::SQS::QueuePolicy
-    Properties:
-      Queues:
-        - !Ref NewObjectQueue
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal: "*"
-            Action:
-            - sqs:SendMessage
-            Resource: !GetAtt NewObjectQueue.Arn
-            Condition:
-              ArnEquals:
-                aws:SourceArn: !Ref NewObjectSNSTopic
-
-  # SQS subscription to SNS topic
-  SubscribeSQStoNewObjectSNSTopic:
-    Type: AWS::SNS::Subscription
-    Properties:
-      Endpoint: !GetAtt NewObjectQueue.Arn
-      Protocol: sqs
-      RawMessageDelivery: true
-      TopicArn: !Ref NewObjectSNSTopic
-
-  AllowedPrefixList:
-    Type: AWS::EC2::PrefixList
-    Properties: 
-      PrefixListName: mission-ridge-uploaders
-      AddressFamily: IPv4 
-      MaxEntries: 8
-      Entries:
-        - Cidr: !Ref CidrRange
-        # - Cidr: "10.10.0.0/16"
-        # - Cidr: "3.235.109.106/32"
-      Tags:
-        - Key: Name
-          Value: !Sub 'allowed-addresses-${AWS::StackName}'
+ 
+  # AllowedPrefixList:
+  #   Type: AWS::EC2::PrefixList
+  #   Properties: 
+  #     PrefixListName: mission-ridge-uploaders
+  #     AddressFamily: IPv4 
+  #     MaxEntries: 8
+  #     Entries:
+  #       - Cidr: !Ref CidrRange
+  #       # - Cidr: "10.10.0.0/16"
+  #       # - Cidr: "3.235.109.106/32"
+  #     Tags:
+  #       - Key: Name
+  #         Value: !Sub 'allowed-addresses-${AWS::StackName}'
 
   AllowedSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties: 
+      VpcId: !Ref VpcId
       GroupDescription: Addresses allowed to connect to sftp
       SecurityGroupIngress: 
-        - SourcePrefixListId: !Ref AllowedPrefixList
+        - CidrIp: !Ref CidrRange
           FromPort: 22  # sftp
           ToPort: 22
           IpProtocol: tcp
@@ -167,9 +99,9 @@ Resources:
     Properties:
       EndpointType: VPC
       EndpointDetails:
-        AddressAllocationIds: 
-          - !GetAtt SftpPublicIp1.AllocationId
-          - !GetAtt SftpPublicIp2.AllocationId
+        # AddressAllocationIds: 
+        #   - !GetAtt SftpPublicIp1.AllocationId
+        #   - !GetAtt SftpPublicIp2.AllocationId
         VpcId: !Ref VpcId
         SubnetIds: 
           - !Ref SubnetId1
@@ -179,15 +111,15 @@ Resources:
       Protocols:
         - SFTP
 
-  SftpPublicIp1:
-    Type: AWS::EC2::EIP
-    Properties: 
-      Domain: vpc
+  # SftpPublicIp1:
+  #   Type: AWS::EC2::EIP
+  #   Properties: 
+  #     Domain: vpc
 
-  SftpPublicIp2:
-    Type: AWS::EC2::EIP
-    Properties: 
-      Domain: vpc
+  # SftpPublicIp2:
+  #   Type: AWS::EC2::EIP
+  #   Properties: 
+  #     Domain: vpc
 
   SftpUserRole:
     Type: AWS::IAM::Role
@@ -212,8 +144,8 @@ Resources:
               - Effect: Allow
                 # Action: 's3:*'
                 Action:
-                  - s3:Put*
-                  # - s3:Get*
+                  - s3:PutObject*
+                  - s3:GetObject*
                 Resource: !Sub '${SftpBucket.Arn}/*'
               - Effect: Allow
                 Action:
@@ -249,8 +181,5 @@ Outputs:
     Value: !Sub '${SftpServer.ServerId}.server.transfer.${AWS::Region}.amazonaws.com'
   SftpBucket:
     Value: !Sub 's3://${SftpBucket}'
-  NewObjectSNSTopic:
-    Value: !Ref NewObjectSNSTopic
-  NewObjectQueue:
-    Value: !Ref NewObjectQueue
+
     

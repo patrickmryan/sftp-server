@@ -15,7 +15,7 @@
     ]
   },
   "context": {
-    "VpcName": "project-vpc",
+    "VpcName": "TransitVPC-Development-network-dev",
     "CidrRanges": ["10.0.0.0/8"],
 
     "@aws-cdk/aws-apigateway:usagePlanKeyOrderInsensitiveId": true,
@@ -28,8 +28,7 @@
     "@aws-cdk/core:checkSecretUsage": true,
     "@aws-cdk/aws-iam:minimizePolicies": true,
     "@aws-cdk/core:target-partitions": [
-      "aws",
-      "aws-cn"
+      "aws"
     ]
   }
 }
