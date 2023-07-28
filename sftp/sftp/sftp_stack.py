@@ -63,7 +63,6 @@ class SftpStack(Stack):
                     statements=[
                         iam.PolicyStatement(
                             effect=iam.Effect.ALLOW,
-                            # principals=[iam.AnyPrincipal()],  # change to restrict to server
                             actions=[
                                 "logs:CreateLogGroup",
                                 "logs:CreateLogStream",
@@ -71,7 +70,7 @@ class SftpStack(Stack):
                             ],
                             resources=["*"],
                         )
-                    ]
+                    ],
                 )
             },
         )
