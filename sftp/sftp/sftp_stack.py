@@ -10,6 +10,7 @@ from aws_cdk import (
     Aspects,
     IAspect,
     CfnResource,
+    CfnOutput,
 )
 from constructs import Construct, IConstruct
 import jsii
@@ -166,27 +167,8 @@ class SftpStack(Stack):
             assumed_by=iam.ServicePrincipal("transfer.amazonaws.com"),
             inline_policies={"logs": logging_policy},
         )
+        # too broad.  need to scope down.
         bucket.grant_read_write(user_role)  # objects_key_pattern
-
-        #  - Effect: Allow
-        #     Action:
-        #       - s3:PutObject*
-        #       - s3:GetObject*
-        #     Resource: !Sub '${SftpBucket.Arn}/*'
-        #   - Effect: Allow
-        #     Action:
-        #       - s3:List*
-        #     Resource: !Sub '${SftpBucket.Arn}'
-        #   - Effect: Allow
-        #     Action: 'events:*'
-        #     Resource: '*'
-        #   - Effect: Allow
-        #     Action:
-        #       - logs:CreateLogStream
-        #       - logs:DescribeLogStreams
-        #       - logs:CreateLogGroup
-        #       - logs:PutLogEvents
-        #     Resource: '*'
 
         logging_role = iam.Role(
             self,
@@ -195,14 +177,14 @@ class SftpStack(Stack):
             inline_policies={"logs": logging_policy},
         )
 
-        vpc_endpoint = ec2.CfnVPCEndpoint(
-            self,
-            "VpcEndpoint",
-            service_name=f"com.amazonaws.{self.region}.transfer",
-            vpc_id=vpc.vpc_id,
-            subnet_ids=subnet_ids,
-            vpc_endpoint_type="Interface",
-        )
+        # vpc_endpoint = ec2.CfnVPCEndpoint(
+        #     self,
+        #     "VpcEndpoint",
+        #     service_name=f"com.amazonaws.{self.region}.transfer",
+        #     vpc_id=vpc.vpc_id,
+        #     subnet_ids=subnet_ids,
+        #     vpc_endpoint_type="Interface",
+        # )
 
         server = transfer.CfnServer(
             self,
@@ -212,28 +194,22 @@ class SftpStack(Stack):
                 vpc_id=vpc.vpc_id,
                 security_group_ids=[security_group.security_group_id],
                 subnet_ids=subnet_ids,
-                # vpc_endpoint_id=vpc_endpoint.ref,
-                # address_allocation_ids=["addressAllocationIds"],
             ),
             endpoint_type="VPC",
             protocols=["SFTP"],
             logging_role=logging_role.role_arn,
         )
 
+        #   SftpServerAddress:
+        #     Value: !Sub '${SftpServer.ServerId}.server.transfer.${AWS::Region}.amazonaws.com'
 
-# SftpServer:
-#   Type: AWS::Transfer::Server
-#   Properties:
-#     EndpointType: VPC
-#     EndpointDetails:
-#       AddressAllocationIds:
-#         - !GetAtt SftpPublicIp1.AllocationId
-#         - !GetAtt SftpPublicIp2.AllocationId
-#       VpcId: !Ref VpcId
-#       SubnetIds:
-#         - !Ref SubnetId1
-#         - !Ref SubnetId2
-#       SecurityGroupIds:
-#         - !GetAtt AllowedSecurityGroup.GroupId
-#     Protocols:
-#       - SFTP
+        CfnOutput(
+            self,
+            "SftpServerAddress",
+            value=f"{server.attr_server_id}.server.transfer.{self.region}.amazonaws.com",
+        )
+        CfnOutput(
+            self,
+            "SftpBucketName",
+            value="s3://" + bucket_name,
+        )
