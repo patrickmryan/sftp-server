@@ -165,6 +165,7 @@ class SftpStack(Stack):
             assumed_by=iam.ServicePrincipal("transfer.amazonaws.com"),
             inline_policies={
                 "logs": logging_policy,
+                # https://aws.amazon.com/blogs/storage/simplify-your-aws-sftp-structure-with-chroot-and-logical-directories/
                 "s3": iam.PolicyDocument(
                     assign_sids=True,
                     statements=[
@@ -179,6 +180,8 @@ class SftpStack(Stack):
                             effect=iam.Effect.ALLOW,
                             actions=[
                                 "s3:PutObject",
+                                "s3:GetObject*",
+                                "s3:DeleteObject",  # needed for test
                             ],
                             resources=[bucket.arn_for_objects("*")],
                         ),
@@ -198,9 +201,11 @@ class SftpStack(Stack):
             self,
             "SftpServer",
             pre_authentication_login_banner="""
-a very important sftp server""",
+a very important sftp server
+""",
             post_authentication_login_banner="""
-This is a US Government server.""",
+This is a US Government server.
+""",
             endpoint_details=transfer.CfnServer.EndpointDetailsProperty(
                 vpc_id=vpc.vpc_id,
                 security_group_ids=[security_group.security_group_id],
@@ -210,6 +215,8 @@ This is a US Government server.""",
             protocols=["SFTP"],
             logging_role=logging_role.role_arn,
         )
+
+        # create NLB. accept tcp 22. point to endpoints.
 
         CfnOutput(
             self,
@@ -226,3 +233,9 @@ This is a US Government server.""",
             "SftpUserRole",
             value=user_role.role_arn,
         )
+
+        # CfnOutput(
+        #     self,
+        #     "SftpEndpointDetails",
+        #     value=server.endpoint_details,
+        # )
