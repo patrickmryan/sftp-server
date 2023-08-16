@@ -132,8 +132,6 @@ class SftpStack(Stack):
             cidr_ranges = []
 
         vpc = ec2.Vpc.from_lookup(self, "Vpc", vpc_id=vpc_id)
-
-        # subnets = vpc.private_subnets
         subnet_ids = self.node.try_get_context("SubnetIds")
 
         security_group = ec2.SecurityGroup(self, "SftpSecurityGroup", vpc=vpc)
@@ -165,10 +163,29 @@ class SftpStack(Stack):
             self,
             "TransferUserRole",
             assumed_by=iam.ServicePrincipal("transfer.amazonaws.com"),
-            inline_policies={"logs": logging_policy},
+            inline_policies={
+                "logs": logging_policy,
+                "s3": iam.PolicyDocument(
+                    assign_sids=True,
+                    statements=[
+                        iam.PolicyStatement(
+                            effect=iam.Effect.ALLOW,
+                            actions=[
+                                "s3:List*",
+                            ],
+                            resources=[bucket.bucket_arn],
+                        ),
+                        iam.PolicyStatement(
+                            effect=iam.Effect.ALLOW,
+                            actions=[
+                                "s3:PutObject",
+                            ],
+                            resources=[bucket.arn_for_objects("*")],
+                        ),
+                    ],
+                ),
+            },
         )
-        # too broad.  need to scope down.
-        bucket.grant_read_write(user_role)  # objects_key_pattern
 
         logging_role = iam.Role(
             self,
@@ -177,19 +194,13 @@ class SftpStack(Stack):
             inline_policies={"logs": logging_policy},
         )
 
-        # vpc_endpoint = ec2.CfnVPCEndpoint(
-        #     self,
-        #     "VpcEndpoint",
-        #     service_name=f"com.amazonaws.{self.region}.transfer",
-        #     vpc_id=vpc.vpc_id,
-        #     subnet_ids=subnet_ids,
-        #     vpc_endpoint_type="Interface",
-        # )
-
         server = transfer.CfnServer(
             self,
             "SftpServer",
-            pre_authentication_login_banner="a very important sftp server",
+            pre_authentication_login_banner="""
+a very important sftp server""",
+            post_authentication_login_banner="""
+This is a US Government server.""",
             endpoint_details=transfer.CfnServer.EndpointDetailsProperty(
                 vpc_id=vpc.vpc_id,
                 security_group_ids=[security_group.security_group_id],
@@ -200,9 +211,6 @@ class SftpStack(Stack):
             logging_role=logging_role.role_arn,
         )
 
-        #   SftpServerAddress:
-        #     Value: !Sub '${SftpServer.ServerId}.server.transfer.${AWS::Region}.amazonaws.com'
-
         CfnOutput(
             self,
             "SftpServerAddress",
@@ -212,4 +220,9 @@ class SftpStack(Stack):
             self,
             "SftpBucketName",
             value="s3://" + bucket_name,
+        )
+        CfnOutput(
+            self,
+            "SftpUserRole",
+            value=user_role.role_arn,
         )
