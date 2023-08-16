@@ -15,8 +15,11 @@
     ]
   },
   "context": {
-    "VpcName": "TransitVPC-Development-network-dev",
+    "VpcId": "vpc-009ab6410b1980e4f",
+    "SubnetIds": ["subnet-0bead01f2c457668f", "subnet-0d1bf70f909edc0b2"],
     "CidrRanges": ["10.0.0.0/8"],
+    "PermissionsBoundaryPolicyName": "ose.boundary.DeveloperFull",
+    "BucketName": "fmc-backup-dev",
 
     "@aws-cdk/aws-apigateway:usagePlanKeyOrderInsensitiveId": true,
     "@aws-cdk/core:stackRelativeExports": true,

@@ -1,15 +1,18 @@
-#!/usr/bin/env python3
 import os
-
-import aws_cdk as cdk
-
+from aws_cdk import App, Environment, LegacyStackSynthesizer
 from sftp.sftp_stack import SftpStack
 
-env = cdk.Environment(
-    account=os.getenv("CDK_DEFAULT_ACCOUNT"), region=os.getenv("CDK_DEFAULT_REGION")
+env = Environment(
+    account=os.getenv("CDK_DEFAULT_ACCOUNT"),
+    region=os.getenv("CDK_DEFAULT_REGION"),
 )
 
-app = cdk.App()
-SftpStack(app, "SftpStack", env=env)
+app = App()
+SftpStack(
+    app,
+    "SftpStack",
+    env=env,
+    synthesizer=LegacyStackSynthesizer(),
+)
 
 app.synth()
