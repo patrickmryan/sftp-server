@@ -172,14 +172,14 @@ class SftpStack(Stack):
                         iam.PolicyStatement(
                             effect=iam.Effect.ALLOW,
                             actions=[
-                                "s3:List*",
+                                "s3:ListBucket*",
                             ],
                             resources=[bucket.bucket_arn],
                         ),
                         iam.PolicyStatement(
                             effect=iam.Effect.ALLOW,
                             actions=[
-                                "s3:PutObject",
+                                "s3:PutObject*",
                                 "s3:GetObject*",
                                 "s3:DeleteObject",  # needed for test
                             ],
