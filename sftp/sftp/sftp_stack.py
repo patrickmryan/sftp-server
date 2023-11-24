@@ -1,5 +1,6 @@
 import sys
 import boto3
+import json
 
 from aws_cdk import (
     Stack,
@@ -187,8 +188,30 @@ class SftpStack(Stack):
                         ),
                     ],
                 ),
+                "efs": iam.PolicyDocument(
+                    assign_sids=True,
+                    statements=[
+                        iam.PolicyStatement(
+                            effect=iam.Effect.ALLOW,
+                            actions=[
+                                "elasticfilesystem:Describe*",
+                                "elasticfilesystem:List*",
+                                "elasticfilesystem:ClientWrite",
+                                "elasticfilesystem:ClientRootAccess",
+                                "elasticfilesystem:ClientMount",
+                            ],
+                            resources=["*"],
+                        ),
+                    ],
+                ),
             },
         )
+
+        # user_role.add_managed_policy(
+        #     iam.ManagedPolicy.from_aws_managed_policy_name(
+        #         "AmazonElasticFileSystemClientFullAccess"
+        #     )
+        # )
 
         logging_role = iam.Role(
             self,
@@ -211,23 +234,28 @@ This is a US Government server.
                 security_group_ids=[security_group.security_group_id],
                 subnet_ids=subnet_ids,
             ),
+            domain="EFS",
+            identity_provider_type="SERVICE_MANAGED",  # AWS_DIRECTORY_SERVICE
             endpoint_type="VPC",
             protocols=["SFTP"],
+            # protocol_details
             logging_role=logging_role.role_arn,
         )
 
-        # create NLB. accept tcp 22. point to endpoints.
+        # create NLB. accept tcp 22. register endpoints.
+        # custom resource to extract endpoints from server.
 
-        CfnOutput(
-            self,
-            "SftpServerAddress",
-            value=f"{server.attr_server_id}.server.transfer.{self.region}.amazonaws.com",
-        )
-        CfnOutput(
-            self,
-            "SftpBucketName",
-            value="s3://" + bucket_name,
-        )
+        # CfnOutput(
+        #     self,
+        #     "SftpServerAddress",
+        #     value=f"{server.attr_server_id}.server.transfer.{self.region}.amazonaws.com",
+        # )
+
+        # CfnOutput(
+        #     self,
+        #     "SftpBucketName",
+        #     value="s3://" + bucket_name,
+        # )
         CfnOutput(
             self,
             "SftpUserRole",
@@ -237,5 +265,5 @@ This is a US Government server.
         # CfnOutput(
         #     self,
         #     "SftpEndpointDetails",
-        #     value=server.endpoint_details,
+        #     value=json.dumps(server.endpoint_details),
         # )

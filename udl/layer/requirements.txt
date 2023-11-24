@@ -1,4 +1,0 @@
-pandas
-daal==2021.2.3
-pathlib
-numpy<1.21
