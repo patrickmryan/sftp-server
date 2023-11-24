@@ -1,6 +1,8 @@
 import sys
+import os
 import boto3
 import json
+from os.path import join
 
 from aws_cdk import (
     Stack,
@@ -227,59 +229,6 @@ class SftpStack(Stack):
         #     self, "TransferBucket", bucket_name=bucket_name
         # )
 
-        user_role = iam.Role(
-            self,
-            "TransferUserRole",
-            assumed_by=iam.ServicePrincipal("transfer.amazonaws.com"),
-            inline_policies={
-                "logs": logging_policy,
-                # https://aws.amazon.com/blogs/storage/simplify-your-aws-sftp-structure-with-chroot-and-logical-directories/
-                # "s3": iam.PolicyDocument(
-                #     assign_sids=True,
-                #     statements=[
-                #         iam.PolicyStatement(
-                #             effect=iam.Effect.ALLOW,
-                #             actions=[
-                #                 "s3:ListBucket*",
-                #             ],
-                #             resources=[bucket.bucket_arn],
-                #         ),
-                #         iam.PolicyStatement(
-                #             effect=iam.Effect.ALLOW,
-                #             actions=[
-                #                 "s3:PutObject*",
-                #                 "s3:GetObject*",
-                #                 "s3:DeleteObject",  # needed for test
-                #             ],
-                #             resources=[bucket.arn_for_objects("*")],
-                #         ),
-                #     ],
-                # ),
-                "efs": iam.PolicyDocument(
-                    assign_sids=True,
-                    statements=[
-                        iam.PolicyStatement(
-                            effect=iam.Effect.ALLOW,
-                            actions=[
-                                "elasticfilesystem:Describe*",
-                                "elasticfilesystem:List*",
-                                "elasticfilesystem:ClientWrite",
-                                "elasticfilesystem:ClientRootAccess",
-                                "elasticfilesystem:ClientMount",
-                            ],
-                            resources=["*"],
-                        ),
-                    ],
-                ),
-            },
-        )
-
-        # user_role.add_managed_policy(
-        #     iam.ManagedPolicy.from_aws_managed_policy_name(
-        #         "AmazonElasticFileSystemClientFullAccess"
-        #     )
-        # )
-
         logging_role = iam.Role(
             self,
             "TransferLoggingRole",
@@ -310,7 +259,44 @@ This is a US Government server.
             logging_role=logging_role.role_arn,
         )
 
-        ssh_keys = self.node.try_get_context("SshKeys") or []
+        user_role = iam.Role(
+            self,
+            "TransferUserRole",
+            assumed_by=iam.ServicePrincipal("transfer.amazonaws.com"),
+            inline_policies={
+                "logs": logging_policy,
+                "efs": iam.PolicyDocument(
+                    assign_sids=True,
+                    statements=[
+                        iam.PolicyStatement(
+                            effect=iam.Effect.ALLOW,
+                            actions=[
+                                "elasticfilesystem:Describe*",
+                                "elasticfilesystem:List*",
+                                "elasticfilesystem:ClientWrite",
+                                "elasticfilesystem:ClientRootAccess",
+                                "elasticfilesystem:ClientMount",
+                            ],
+                            resources=[fs.file_system_arn],
+                        ),
+                    ],
+                ),
+            },
+        )
+
+        ssh_keys = []
+        key_files = self.node.try_get_context("SshKeyFiles") or []
+        home = os.environ.get("HOME")
+        for filename in key_files:
+            if filename[0] == "/":
+                path = filename
+            else:
+                path = join(home, ".ssh", filename)
+
+            with open(path) as fp:
+                # print(f"getting ssh public key from {path}", file=sys.stderr)
+                for line in fp.readlines():
+                    ssh_keys.append(line.strip())
 
         user = transfer.CfnUser(
             self,
@@ -326,11 +312,11 @@ This is a US Government server.
         # create NLB. accept tcp 22. register endpoints.
         # custom resource to extract endpoints from server.
 
-        # CfnOutput(
-        #     self,
-        #     "SftpServerAddress",
-        #     value=f"{server.attr_server_id}.server.transfer.{self.region}.amazonaws.com",
-        # )
+        CfnOutput(
+            self,
+            "SftpServerAddress",
+            value=f"{server.attr_server_id}.server.transfer.{self.region}.amazonaws.com",
+        )
 
         # CfnOutput(
         #     self,

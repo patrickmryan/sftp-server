@@ -20,10 +20,7 @@
     "CidrRanges": ["10.0.0.0/8"],
     "PermissionsBoundaryPolicyName": "",
     "IamRolePath": "/adm/na/",
-    "SshKeys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDWDBPhdL1UyHs0itLU0TtXlmN0wABUIPQsDHfRJpvf17odNnUGTG9KTw1fc4LCtHD5nUOJuK6bsvRDVxWcIeWJMCd9pgATwfl+/A5bZUsBkHc2EGSU2LP1/OGRNc81E0lUk7f06ymUZ4MJ53E+YquGR8R9X+zarHPYp361AuYTffmiJVSvcPvB7svQFDc3ADUZauXWXA504BvK6szHvihubpJcbp/r4eIussq5SIX3Lqkpkf/3pdjfBixv9Ngs1nMNnukm1TBRkyQ3ALLnf8wlYIDQCsxUha3KQqyTGwLRPCYaAdtj2OsL9twn8IzguF4VbKvBcKLgnMMOOUBcSED patrick85-dev@patrick85-diyos.dev.osn.dom"],
-
     "SshKeyFiles": ["fmc_backup.pub"],
-
 
     "@aws-cdk/aws-apigateway:usagePlanKeyOrderInsensitiveId": true,
     "@aws-cdk/core:stackRelativeExports": true,
