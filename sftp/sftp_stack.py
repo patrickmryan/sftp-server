@@ -10,6 +10,7 @@ from aws_cdk import (
     aws_iam as iam,
     aws_ec2 as ec2,
     aws_transfer as transfer,
+    aws_logs as logs,
     # aws_s3 as s3,
     aws_efs as efs,
     Aspects,
@@ -223,17 +224,15 @@ class SftpStack(Stack):
             file_system_policy=file_system_policy,
         )
 
-        # bucket_name = self.node.try_get_context("BucketName")
-
-        # bucket = s3.Bucket.from_bucket_attributes(
-        #     self, "TransferBucket", bucket_name=bucket_name
-        # )
-
         logging_role = iam.Role(
             self,
             "TransferLoggingRole",
             assumed_by=iam.ServicePrincipal("transfer.amazonaws.com"),
             inline_policies={"logs": logging_policy},
+        )
+
+        log_group = logs.LogGroup(
+            self, "TransferLogGroup", retention=logs.RetentionDays.ONE_WEEK
         )
 
         server = transfer.CfnServer(
@@ -256,6 +255,7 @@ This is a US Government server.
             endpoint_type="VPC",
             protocols=["SFTP"],
             # protocol_details
+            structured_log_destinations=[log_group.log_group_arn],
             logging_role=logging_role.role_arn,
         )
 
@@ -298,6 +298,9 @@ This is a US Government server.
                 for line in fp.readlines():
                     ssh_keys.append(line.strip())
 
+        # fs-0e4fbfe7c23653044.efs.us-east-1.amazonaws.com:/
+        # target = f"{fs.file_system_id}.efs.{self.region}.amazonaws.com:/"
+
         user = transfer.CfnUser(
             self,
             "CfnUser",
@@ -305,8 +308,13 @@ This is a US Government server.
             server_id=server.attr_server_id,
             user_name="fmc_backup",
             ssh_public_keys=ssh_keys,
-            # home_directory
-            # home_directory_mappings
+            home_directory="/" + fs.file_system_id + "/",
+            # home_directory_mappings=[
+            #     transfer.CfnUser.HomeDirectoryMapEntryProperty(
+            #     entry="/",
+            #     target="/"+fs.file_system_id+"/"
+            # )],
+            # home_directory_type
         )
 
         # create NLB. accept tcp 22. register endpoints.
