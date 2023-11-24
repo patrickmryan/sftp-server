@@ -32,13 +32,15 @@ class IamNamingAspect:
 
     def __init__(
         self,
-        role_prefix: str = "Network",
-        policy_prefix: str = "Network",
-        instance_profile_prefix: str = "Network",
+        role_prefix: str = "",
+        policy_prefix: str = "",
+        instance_profile_prefix: str = "",
+        role_path: str = "",
     ):
         self.role_prefix = role_prefix
         self.policy_prefix = policy_prefix
         self.instance_profile_prefix = instance_profile_prefix
+        self.role_path = role_path
 
     def visit(self, node: IConstruct):
         if not (
@@ -49,15 +51,24 @@ class IamNamingAspect:
 
         resource_type = node.cfn_resource_type
         resource_id = self._get_resource_id(node.node.path)
-        if "IAM::Role" in resource_type:
+
+        if "IAM::Role" in resource_type or "IAM::InstanceProfile" in resource_type:
+            role_path_override = self.role_path or ""
+
+        if (self.role_path or self.role_prefix) and "IAM::Role" in resource_type:
             try:
                 role_name = node.role_name
-            except Exception:
+
+            except Exception as exc:
                 role_name = node.node.addr
-            if not role_name.startswith(self.role_prefix):
+
+            if self.role_prefix and not role_name.startswith(self.role_prefix):
                 node.add_property_override(
                     "RoleName", f"{self.role_prefix}{resource_id}"[:64]
                 )
+            if role_path_override:
+                node.add_property_override("Path", role_path_override)
+
         elif "IAM::Policy" in resource_type:
             if not node.policy_name.startswith(self.policy_prefix):
                 node.add_property_override(
@@ -75,6 +86,8 @@ class IamNamingAspect:
                 "InstanceProfileName",
                 f"{self.instance_profile_prefix}{resource_id}"[:128],
             )
+            if role_path_override:
+                node.add_property_override("Path", role_path_override)
 
     def _get_resource_id(self, resource_path):
         path_split = [x.replace(":", "") for x in resource_path.split("/")]
@@ -194,7 +207,11 @@ class SftpStack(Stack):
             file_system_name="FmcBackup",
             vpc=vpc,
             vpc_subnets=ec2.SubnetSelection(
-                subnets=ec2.SelectedSubnets(subnets_ids=subnet_ids)
+                # subnets=ec2.SelectedSubnets(subnet_ids=subnet_ids)
+                subnets=[
+                    ec2.Subnet.from_subnet_id(self, "efs-" + subnet_id, subnet_id)
+                    for subnet_id in subnet_ids
+                ]
             ),
             security_group=security_group,
             removal_policy=RemovalPolicy.RETAIN,
@@ -270,15 +287,6 @@ class SftpStack(Stack):
             inline_policies={"logs": logging_policy},
         )
 
-        security_group = ec2.SecurityGroup(self, "EfsAccess", vpc=vpc)
-
-        # allow connections on the NFS port from inside the VPC
-        nfs_port = ec2.Port.tcp(2049)  # NFS port
-        for cidr_range in cidr_ranges:
-            security_group.add_ingress_rule(
-                peer=ec2.Peer.ipv4(cidr_range), connection=nfs_port
-            )
-
         server = transfer.CfnServer(
             self,
             "SftpServer",
@@ -307,7 +315,7 @@ This is a US Government server.
         user = transfer.CfnUser(
             self,
             "CfnUser",
-            role=user_role,
+            role=user_role.role_arn,
             server_id=server.attr_server_id,
             user_name="fmc_backup",
             ssh_public_keys=ssh_keys,
