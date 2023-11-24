@@ -65,12 +65,12 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub 'sftp-${AWS::StackName}'
- 
+
   # AllowedPrefixList:
   #   Type: AWS::EC2::PrefixList
-  #   Properties: 
+  #   Properties:
   #     PrefixListName: mission-ridge-uploaders
-  #     AddressFamily: IPv4 
+  #     AddressFamily: IPv4
   #     MaxEntries: 8
   #     Entries:
   #       - Cidr: !Ref CidrRange
@@ -82,10 +82,10 @@ Resources:
 
   AllowedSecurityGroup:
     Type: AWS::EC2::SecurityGroup
-    Properties: 
+    Properties:
       VpcId: !Ref VpcId
       GroupDescription: Addresses allowed to connect to sftp
-      SecurityGroupIngress: 
+      SecurityGroupIngress:
         - CidrIp: !Ref CidrRange
           FromPort: 22  # sftp
           ToPort: 22
@@ -93,32 +93,32 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub 'allowed-addresses-${AWS::StackName}'
-      
+
   SftpServer:
     Type: AWS::Transfer::Server
     Properties:
       EndpointType: VPC
       EndpointDetails:
-        # AddressAllocationIds: 
+        # AddressAllocationIds:
         #   - !GetAtt SftpPublicIp1.AllocationId
         #   - !GetAtt SftpPublicIp2.AllocationId
         VpcId: !Ref VpcId
-        SubnetIds: 
+        SubnetIds:
           - !Ref SubnetId1
           - !Ref SubnetId2
-        SecurityGroupIds: 
+        SecurityGroupIds:
           - !GetAtt AllowedSecurityGroup.GroupId
       Protocols:
         - SFTP
 
   # SftpPublicIp1:
   #   Type: AWS::EC2::EIP
-  #   Properties: 
+  #   Properties:
   #     Domain: vpc
 
   # SftpPublicIp2:
   #   Type: AWS::EC2::EIP
-  #   Properties: 
+  #   Properties:
   #     Domain: vpc
 
   SftpUserRole:
@@ -181,5 +181,3 @@ Outputs:
     Value: !Sub '${SftpServer.ServerId}.server.transfer.${AWS::Region}.amazonaws.com'
   SftpBucket:
     Value: !Sub 's3://${SftpBucket}'
-
-    

@@ -15,5 +15,5 @@ repos:
     rev: 6.1.0
     hooks:
     -   id: flake8
-        exclude: tests/
+        exclude: ^(tests/|historical/)
         args: [ "--extend-ignore=E262,E501,E401,F401,F841" ]

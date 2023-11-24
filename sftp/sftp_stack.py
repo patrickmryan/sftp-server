@@ -4,10 +4,12 @@ import json
 
 from aws_cdk import (
     Stack,
+    RemovalPolicy,
     aws_iam as iam,
     aws_ec2 as ec2,
     aws_transfer as transfer,
-    aws_s3 as s3,
+    # aws_s3 as s3,
+    aws_efs as efs,
     Aspects,
     IAspect,
     CfnResource,
@@ -112,14 +114,20 @@ class SftpStack(Stack):
             iam.PermissionsBoundary.of(self).apply(policy)
 
         # need this in role names
-        role_name_prefix = "Network"
-        Aspects.of(self).add(
-            IamNamingAspect(
-                role_prefix=role_name_prefix,
-                policy_prefix=role_name_prefix,
-                instance_profile_prefix=role_name_prefix,
-            )
-        )
+        # role_name_prefix = "Network"
+        # Aspects.of(self).add(
+        #     IamNamingAspect(
+        #         role_prefix=role_name_prefix,
+        #         policy_prefix=role_name_prefix,
+        #         instance_profile_prefix=role_name_prefix,
+        #     )
+        # )
+
+        iam_role_path = self.node.try_get_context("IamRolePath") or "/"
+        if iam_role_path[-1] != "/":
+            iam_role_path += "/"
+
+        Aspects.of(self).add(IamNamingAspect(role_path=iam_role_path))
 
         key = "VpcId"
         vpc_id = self.node.try_get_context(key)
@@ -154,11 +162,53 @@ class SftpStack(Stack):
             ],
         )
 
-        bucket_name = self.node.try_get_context("BucketName")
+        # cidr_ranges = [
+        #     assoc_set["CidrBlock"] for assoc_set in ec2_vpc["CidrBlockAssociationSet"]
+        # ]
 
-        bucket = s3.Bucket.from_bucket_attributes(
-            self, "TransferBucket", bucket_name=bucket_name
+        security_group = ec2.SecurityGroup(self, "EfsAccess", vpc=vpc)
+
+        # allow connections on the NFS port from inside the VPC
+        nfs_port = ec2.Port.tcp(2049)  # NFS port
+        for cidr_range in cidr_ranges:
+            security_group.add_ingress_rule(
+                peer=ec2.Peer.ipv4(cidr_range), connection=nfs_port
+            )
+
+        file_system_policy = iam.PolicyDocument(
+            statements=[
+                iam.PolicyStatement(
+                    effect=iam.Effect.ALLOW,
+                    actions=["elasticfilesystem:Client*"],
+                    principals=[iam.AnyPrincipal()],
+                    conditions={
+                        "Bool": {"elasticfilesystem:AccessedViaMountTarget": "true"}
+                    },
+                )
+            ]
         )
+
+        fs = efs.FileSystem(
+            self,
+            "Backup",
+            file_system_name="FmcBackup",
+            vpc=vpc,
+            vpc_subnets=ec2.SubnetSelection(
+                subnets=ec2.SelectedSubnets(subnets_ids=subnet_ids)
+            ),
+            security_group=security_group,
+            removal_policy=RemovalPolicy.RETAIN,
+            enable_automatic_backups=True,
+            lifecycle_policy=efs.LifecyclePolicy.AFTER_30_DAYS,
+            encrypted=True,
+            file_system_policy=file_system_policy,
+        )
+
+        # bucket_name = self.node.try_get_context("BucketName")
+
+        # bucket = s3.Bucket.from_bucket_attributes(
+        #     self, "TransferBucket", bucket_name=bucket_name
+        # )
 
         user_role = iam.Role(
             self,
@@ -167,27 +217,27 @@ class SftpStack(Stack):
             inline_policies={
                 "logs": logging_policy,
                 # https://aws.amazon.com/blogs/storage/simplify-your-aws-sftp-structure-with-chroot-and-logical-directories/
-                "s3": iam.PolicyDocument(
-                    assign_sids=True,
-                    statements=[
-                        iam.PolicyStatement(
-                            effect=iam.Effect.ALLOW,
-                            actions=[
-                                "s3:ListBucket*",
-                            ],
-                            resources=[bucket.bucket_arn],
-                        ),
-                        iam.PolicyStatement(
-                            effect=iam.Effect.ALLOW,
-                            actions=[
-                                "s3:PutObject*",
-                                "s3:GetObject*",
-                                "s3:DeleteObject",  # needed for test
-                            ],
-                            resources=[bucket.arn_for_objects("*")],
-                        ),
-                    ],
-                ),
+                # "s3": iam.PolicyDocument(
+                #     assign_sids=True,
+                #     statements=[
+                #         iam.PolicyStatement(
+                #             effect=iam.Effect.ALLOW,
+                #             actions=[
+                #                 "s3:ListBucket*",
+                #             ],
+                #             resources=[bucket.bucket_arn],
+                #         ),
+                #         iam.PolicyStatement(
+                #             effect=iam.Effect.ALLOW,
+                #             actions=[
+                #                 "s3:PutObject*",
+                #                 "s3:GetObject*",
+                #                 "s3:DeleteObject",  # needed for test
+                #             ],
+                #             resources=[bucket.arn_for_objects("*")],
+                #         ),
+                #     ],
+                # ),
                 "efs": iam.PolicyDocument(
                     assign_sids=True,
                     statements=[
@@ -220,6 +270,15 @@ class SftpStack(Stack):
             inline_policies={"logs": logging_policy},
         )
 
+        security_group = ec2.SecurityGroup(self, "EfsAccess", vpc=vpc)
+
+        # allow connections on the NFS port from inside the VPC
+        nfs_port = ec2.Port.tcp(2049)  # NFS port
+        for cidr_range in cidr_ranges:
+            security_group.add_ingress_rule(
+                peer=ec2.Peer.ipv4(cidr_range), connection=nfs_port
+            )
+
         server = transfer.CfnServer(
             self,
             "SftpServer",
@@ -231,6 +290,7 @@ This is a US Government server.
 """,
             endpoint_details=transfer.CfnServer.EndpointDetailsProperty(
                 vpc_id=vpc.vpc_id,
+                # vpc_endpoint_id=
                 security_group_ids=[security_group.security_group_id],
                 subnet_ids=subnet_ids,
             ),
@@ -240,6 +300,19 @@ This is a US Government server.
             protocols=["SFTP"],
             # protocol_details
             logging_role=logging_role.role_arn,
+        )
+
+        ssh_keys = self.node.try_get_context("SshKeys") or []
+
+        user = transfer.CfnUser(
+            self,
+            "CfnUser",
+            role=user_role,
+            server_id=server.attr_server_id,
+            user_name="fmc_backup",
+            ssh_public_keys=ssh_keys,
+            # home_directory
+            # home_directory_mappings
         )
 
         # create NLB. accept tcp 22. register endpoints.

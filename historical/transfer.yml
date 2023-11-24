@@ -1,0 +1,151 @@
+Resources:
+  SftpSecurityGroupD63D0265:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: SftpStack/SftpSecurityGroup
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic by default
+          IpProtocol: "-1"
+      SecurityGroupIngress:
+        - CidrIp: 10.0.0.0/8
+          Description: from 10.0.0.0/8:22
+          FromPort: 22
+          IpProtocol: tcp
+          ToPort: 22
+      VpcId: vpc-009ab6410b1980e4f
+    Metadata:
+      aws:cdk:path: SftpStack/SftpSecurityGroup/Resource
+  TransferUserRoleB5482E67:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: transfer.amazonaws.com
+        Version: "2012-10-17"
+      PermissionsBoundary:
+        Fn::Join:
+          - ""
+          - - "arn:"
+            - Ref: AWS::Partition
+            - :iam::805859318373:policy/ose.boundary.DeveloperFull
+      Policies:
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Effect: Allow
+                Resource: "*"
+                Sid: "0"
+            Version: "2012-10-17"
+          PolicyName: logs
+    Metadata:
+      aws:cdk:path: SftpStack/TransferUserRole/Resource
+  TransferUserRoleDefaultPolicyB7C1331B:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - s3:Abort*
+              - s3:DeleteObject*
+              - s3:GetBucket*
+              - s3:GetObject*
+              - s3:List*
+              - s3:PutObject
+              - s3:PutObjectLegalHold
+              - s3:PutObjectRetention
+              - s3:PutObjectTagging
+              - s3:PutObjectVersionTagging
+            Effect: Allow
+            Resource:
+              - Fn::Join:
+                  - ""
+                  - - "arn:"
+                    - Ref: AWS::Partition
+                    - :s3:::fmc-backup-dev
+              - Fn::Join:
+                  - ""
+                  - - "arn:"
+                    - Ref: AWS::Partition
+                    - :s3:::fmc-backup-dev/*
+        Version: "2012-10-17"
+      PolicyName: TransferUserRoleDefaultPolicyB7C1331B
+      Roles:
+        - Ref: TransferUserRoleB5482E67
+    Metadata:
+      aws:cdk:path: SftpStack/TransferUserRole/DefaultPolicy/Resource
+  TransferLoggingRole1ADF8EEC:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: transfer.amazonaws.com
+        Version: "2012-10-17"
+      PermissionsBoundary:
+        Fn::Join:
+          - ""
+          - - "arn:"
+            - Ref: AWS::Partition
+            - :iam::805859318373:policy/ose.boundary.DeveloperFull
+      Policies:
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Effect: Allow
+                Resource: "*"
+                Sid: "0"
+            Version: "2012-10-17"
+          PolicyName: logs
+    Metadata:
+      aws:cdk:path: SftpStack/TransferLoggingRole/Resource
+  VpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      ServiceName: com.amazonaws.us-east-1.transfer
+      SubnetIds:
+        - subnet-0bead01f2c457668f
+        - subnet-0d1bf70f909edc0b2
+      VpcEndpointType: Interface
+      VpcId: vpc-009ab6410b1980e4f
+    Metadata:
+      aws:cdk:path: SftpStack/VpcEndpoint
+  SftpServer:
+    Type: AWS::Transfer::Server
+    Properties:
+      EndpointDetails:
+        SecurityGroupIds:
+          - Fn::GetAtt:
+              - SftpSecurityGroupD63D0265
+              - GroupId
+        SubnetIds:
+          - subnet-0bead01f2c457668f
+          - subnet-0d1bf70f909edc0b2
+        VpcId: vpc-009ab6410b1980e4f
+      EndpointType: VPC
+      LoggingRole:
+        Fn::GetAtt:
+          - TransferLoggingRole1ADF8EEC
+          - Arn
+      PreAuthenticationLoginBanner: a very important sftp server
+      Protocols:
+        - SFTP
+    Metadata:
+      aws:cdk:path: SftpStack/SftpServer
+  CDKMetadata:
+    Type: AWS::CDK::Metadata
+    Properties:
+      Analytics: v2:deflate64:H4sIAAAAAAAA/2VOywqDMBD8Fu9x2yoUvCqlV1HotaRxpVs1kU3SIpJ/r4/eeponwySQJXCM5MfGquninh4w106qTlRojWeFYsnuM6pkCVB5Jjdd2fhRFK3+M25lcdHNaEi7IGwKuVcdulxaFCQHmCvT49rbsDQ9qWmVOwvCsdS2RYZtm9/IYWv/rgRRTu5p9CGFDE7n6GWJYvba0YBQ7fgFWBLNNNEAAAA=
+    Metadata:
+      aws:cdk:path: SftpStack/CDKMetadata/Default
