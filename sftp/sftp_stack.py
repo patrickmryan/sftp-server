@@ -178,17 +178,7 @@ class SftpStack(Stack):
             ],
         )
 
-        # cidr_ranges = [
-        #     assoc_set["CidrBlock"] for assoc_set in ec2_vpc["CidrBlockAssociationSet"]
-        # ]
-
         efs_security_group = ec2.SecurityGroup(self, "EfsAccess", vpc=vpc)
-
-        # trust connections from within the security group
-        # security_group.add_ingress_rule(
-        #     peer=ec2.Peer.security_group_id(security_group.security_group_id),
-        #     connection=ec2.Port.all_traffic()
-        # )
 
         # allow connections on the NFS port from inside the VPC
         nfs_port = ec2.Port.tcp(2049)  # NFS port
@@ -203,9 +193,9 @@ class SftpStack(Stack):
                     effect=iam.Effect.ALLOW,
                     actions=["elasticfilesystem:Client*"],
                     principals=[iam.AnyPrincipal()],
-                    conditions={
-                        "Bool": {"elasticfilesystem:AccessedViaMountTarget": "true"}
-                    },
+                    # conditions={
+                    #     "Bool": {"elasticfilesystem:AccessedViaMountTarget": "true"}
+                    # },
                 )
             ]
         )
@@ -216,7 +206,6 @@ class SftpStack(Stack):
             file_system_name="FmcBackup",
             vpc=vpc,
             vpc_subnets=ec2.SubnetSelection(
-                # subnets=ec2.SelectedSubnets(subnet_ids=subnet_ids)
                 subnets=[
                     ec2.Subnet.from_subnet_id(self, "efs-" + subnet_id, subnet_id)
                     for subnet_id in subnet_ids
@@ -227,7 +216,7 @@ class SftpStack(Stack):
             enable_automatic_backups=True,
             lifecycle_policy=efs.LifecyclePolicy.AFTER_30_DAYS,
             encrypted=True,
-            # file_system_policy=file_system_policy,
+            file_system_policy=file_system_policy,
         )
 
         logging_role = iam.Role(
@@ -237,22 +226,13 @@ class SftpStack(Stack):
             inline_policies={"logs": logging_policy},
         )
 
-        log_group = logs.LogGroup(
-            self, "TransferLogGroup", retention=logs.RetentionDays.ONE_WEEK
-        )
-
         server = transfer.CfnServer(
             self,
             "SftpServer",
-            pre_authentication_login_banner="""
-a very important sftp server
-""",
-            post_authentication_login_banner="""
-This is a US Government server.
-""",
+            pre_authentication_login_banner="your papers, please\n",
+            # post_authentication_login_banner="your papers appear to be in order",
             endpoint_details=transfer.CfnServer.EndpointDetailsProperty(
                 vpc_id=vpc.vpc_id,
-                # vpc_endpoint_id=
                 security_group_ids=[sftp_security_group.security_group_id],
                 subnet_ids=subnet_ids,
             ),
@@ -260,9 +240,8 @@ This is a US Government server.
             identity_provider_type="SERVICE_MANAGED",  # AWS_DIRECTORY_SERVICE
             endpoint_type="VPC",
             protocols=["SFTP"],
-            # protocol_details
-            structured_log_destinations=[log_group.log_group_arn],
             logging_role=logging_role.role_arn,
+            # structured_log_destinations=[log_group.log_group_arn],
         )
 
         user_role = iam.Role(
@@ -290,38 +269,38 @@ This is a US Government server.
             },
         )
 
-        ssh_keys = []
-        key_files = self.node.try_get_context("SshKeyFiles") or []
         home = os.environ.get("HOME")
-        for filename in key_files:
+        user_info = self.node.try_get_context("Users") or {}
+        group_id = 501  # set in parameter?
+
+        for username, details in user_info.items():
+            filename = details["SshKeyFile"]
+            user_id = details["UserId"]
+
             if filename[0] == "/":
                 path = filename
             else:
+                # look for the ssh public key file in  ~/.ssh
                 path = join(home, ".ssh", filename)
 
+            ssh_keys = []
             with open(path) as fp:
-                # print(f"getting ssh public key from {path}", file=sys.stderr)
                 for line in fp.readlines():
                     ssh_keys.append(line.strip())
 
-        # fs-0e4fbfe7c23653044.efs.us-east-1.amazonaws.com:/
-        # target = f"{fs.file_system_id}.efs.{self.region}.amazonaws.com:/"
-
-        user = transfer.CfnUser(
-            self,
-            "CfnUser",
-            role=user_role.role_arn,
-            server_id=server.attr_server_id,
-            user_name="fmc_backup",
-            ssh_public_keys=ssh_keys,
-            home_directory="/" + fs.file_system_id + "/",
-            # home_directory_mappings=[
-            #     transfer.CfnUser.HomeDirectoryMapEntryProperty(
-            #     entry="/",
-            #     target="/"+fs.file_system_id+"/"
-            # )],
-            # home_directory_type
-        )
+            # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-transfer-user.html
+            user = transfer.CfnUser(
+                self,
+                f"CfnUser-{username}",
+                role=user_role.role_arn,
+                server_id=server.attr_server_id,
+                user_name=username,
+                ssh_public_keys=ssh_keys,
+                home_directory=f"/{fs.file_system_id}/{username}/",
+                posix_profile={"uid": user_id, "gid": group_id}
+                # policy
+                # home_directory_type
+            )
 
         # create NLB. accept tcp 22. register endpoints.
         # custom resource to extract endpoints from server.
@@ -332,6 +311,12 @@ This is a US Government server.
             value=f"{server.attr_server_id}.server.transfer.{self.region}.amazonaws.com",
         )
 
+        # fs-0e4fbfe7c23653044.efs.us-east-1.amazonaws.com
+        CfnOutput(
+            self,
+            "FileSystemAddress",
+            value=f"{fs.file_system_id}.efs.{self.region}.amazonaws.com",
+        )
         # CfnOutput(
         #     self,
         #     "SftpBucketName",
