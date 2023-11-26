@@ -159,9 +159,9 @@ class SftpStack(Stack):
         vpc = ec2.Vpc.from_lookup(self, "Vpc", vpc_id=vpc_id)
         subnet_ids = self.node.try_get_context("SubnetIds")
 
-        security_group = ec2.SecurityGroup(self, "SftpSecurityGroup", vpc=vpc)
+        sftp_security_group = ec2.SecurityGroup(self, "SftpSecurityGroup", vpc=vpc)
         for cidr in cidr_ranges:
-            security_group.add_ingress_rule(ec2.Peer.ipv4(cidr), ec2.Port.tcp(22))
+            sftp_security_group.add_ingress_rule(ec2.Peer.ipv4(cidr), ec2.Port.tcp(22))
 
         logging_policy = iam.PolicyDocument(
             assign_sids=True,
@@ -182,12 +182,18 @@ class SftpStack(Stack):
         #     assoc_set["CidrBlock"] for assoc_set in ec2_vpc["CidrBlockAssociationSet"]
         # ]
 
-        security_group = ec2.SecurityGroup(self, "EfsAccess", vpc=vpc)
+        efs_security_group = ec2.SecurityGroup(self, "EfsAccess", vpc=vpc)
+
+        # trust connections from within the security group
+        # security_group.add_ingress_rule(
+        #     peer=ec2.Peer.security_group_id(security_group.security_group_id),
+        #     connection=ec2.Port.all_traffic()
+        # )
 
         # allow connections on the NFS port from inside the VPC
         nfs_port = ec2.Port.tcp(2049)  # NFS port
         for cidr_range in cidr_ranges:
-            security_group.add_ingress_rule(
+            efs_security_group.add_ingress_rule(
                 peer=ec2.Peer.ipv4(cidr_range), connection=nfs_port
             )
 
@@ -216,12 +222,12 @@ class SftpStack(Stack):
                     for subnet_id in subnet_ids
                 ]
             ),
-            security_group=security_group,
+            security_group=efs_security_group,
             removal_policy=RemovalPolicy.RETAIN,
             enable_automatic_backups=True,
             lifecycle_policy=efs.LifecyclePolicy.AFTER_30_DAYS,
             encrypted=True,
-            file_system_policy=file_system_policy,
+            # file_system_policy=file_system_policy,
         )
 
         logging_role = iam.Role(
@@ -247,7 +253,7 @@ This is a US Government server.
             endpoint_details=transfer.CfnServer.EndpointDetailsProperty(
                 vpc_id=vpc.vpc_id,
                 # vpc_endpoint_id=
-                security_group_ids=[security_group.security_group_id],
+                security_group_ids=[sftp_security_group.security_group_id],
                 subnet_ids=subnet_ids,
             ),
             domain="EFS",
