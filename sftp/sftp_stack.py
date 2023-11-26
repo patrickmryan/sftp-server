@@ -259,7 +259,7 @@ class SftpStack(Stack):
                                 "elasticfilesystem:Describe*",
                                 "elasticfilesystem:List*",
                                 "elasticfilesystem:ClientWrite",
-                                "elasticfilesystem:ClientRootAccess",
+                                # "elasticfilesystem:ClientRootAccess",
                                 "elasticfilesystem:ClientMount",
                             ],
                             resources=[fs.file_system_arn],
@@ -271,11 +271,11 @@ class SftpStack(Stack):
 
         home = os.environ.get("HOME")
         user_info = self.node.try_get_context("Users") or {}
-        group_id = 501  # set in parameter?
 
         for username, details in user_info.items():
             filename = details["SshKeyFile"]
             user_id = details["UserId"]
+            group_id = details["GroupId"]
 
             if filename[0] == "/":
                 path = filename
@@ -311,25 +311,8 @@ class SftpStack(Stack):
             value=f"{server.attr_server_id}.server.transfer.{self.region}.amazonaws.com",
         )
 
-        # fs-0e4fbfe7c23653044.efs.us-east-1.amazonaws.com
         CfnOutput(
             self,
             "FileSystemAddress",
             value=f"{fs.file_system_id}.efs.{self.region}.amazonaws.com",
         )
-        # CfnOutput(
-        #     self,
-        #     "SftpBucketName",
-        #     value="s3://" + bucket_name,
-        # )
-        CfnOutput(
-            self,
-            "SftpUserRole",
-            value=user_role.role_arn,
-        )
-
-        # CfnOutput(
-        #     self,
-        #     "SftpEndpointDetails",
-        #     value=json.dumps(server.endpoint_details),
-        # )

@@ -23,7 +23,8 @@
     "Users": {
       "fmc_backup": {
         "SshKeyFile": "fmc_backup.pub",
-        "UserId": 5001
+        "UserId": 5001,
+        "GroupId": 501
       }
     },
 
