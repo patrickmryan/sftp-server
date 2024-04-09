@@ -203,7 +203,7 @@ class SftpStack(Stack):
         fs = efs.FileSystem(
             self,
             "Backup",
-            file_system_name="FmcBackup",
+            file_system_name="EfsBackupDrive",
             vpc=vpc,
             vpc_subnets=ec2.SubnetSelection(
                 subnets=[

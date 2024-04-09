@@ -15,8 +15,8 @@
     ]
   },
   "context": {
-    "VpcId": "vpc-009ab6410b1980e4f",
-    "SubnetIds": ["subnet-0bead01f2c457668f", "subnet-0d1bf70f909edc0b2"],
+    "VpcId": "vpc-021a93ecf7ec27962",
+    "SubnetIds": ["subnet-06b4b7a7ce84c94fa", "subnet-05049e5fc39116994"],
     "CidrRanges": ["10.0.0.0/8"],
     "PermissionsBoundaryPolicyName": "",
     "IamRolePath": "/adm/na/",

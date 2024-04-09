@@ -1,0 +1,18 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": "*"
+            },
+            "Action": "elasticfilesystem:Client*",
+            "Resource": "arn:aws:elasticfilesystem:us-east-1:805859318373:file-system/fs-0e4fbfe7c23653044",
+            "Condition": {
+                "Bool": {
+                    "elasticfilesystem:AccessedViaMountTarget": "true"
+                }
+            }
+        }
+    ]
+}
