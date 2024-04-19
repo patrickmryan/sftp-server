@@ -5,6 +5,7 @@ file system. User accounts are set up using a key pair.
 
 
 | Parameter | Purpose |
+| ------------- | ------------ |
 | VpcId | ID of the VPC where the sftp server will be attached. |
 | SubnetIds | List of subnets to be used for allocating ENIs. |
 | CidrRanges | List of CIDR ranges that will be allowed in. |
