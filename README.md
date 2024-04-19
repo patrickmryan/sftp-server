@@ -3,6 +3,7 @@
 This stack deploys a private sftp server using AWS Transfer. The underyling storage is an AWS EFS
 file system. User accounts are set up using a key pair.
 
+## cdk.json parameters
 
 | Parameter | Purpose |
 | ------------- | ------------ |
