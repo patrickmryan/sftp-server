@@ -226,6 +226,9 @@ class SftpStack(Stack):
             inline_policies={"logs": logging_policy},
         )
 
+        # https://docs.aws.amazon.com/transfer/latest/userguide/create-server-sftp.html
+        # https://docs.aws.amazon.com/transfer/latest/userguide/directory-services-users.html
+
         server = transfer.CfnServer(
             self,
             "SftpServer",
